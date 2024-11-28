@@ -1,0 +1,18 @@
+[theme]
+base="dark"
+primaryColor="#FF9A72"
+backgroundColor="#277AA2"
+secondaryBackgroundColor="#08567C"
+textColor="#FFF1D0"
+font = "monospace"
+
+[client]
+showSidebarNavigation = false
+toolbarMode = "auto"
+
+[server]
+enableXsrfProtection=false
+enableStaticServing = true
+
+[browser]
+serverAddress="localhost"

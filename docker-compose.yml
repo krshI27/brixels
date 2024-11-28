@@ -1,0 +1,29 @@
+name: brixels
+
+services:
+  brixels:
+    container_name: brixels
+    image: brixels:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 8502:8501
+    stdin_open: true
+    restart: always
+    volumes:
+      - data:/data
+      - repo:/app
+volumes:
+  data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '~/dev/data'
+  repo:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '~/dev/brixels'

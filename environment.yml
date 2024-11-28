@@ -1,0 +1,19 @@
+name: brixels
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - pillow
+  - geopandas
+  - folium
+  - rasterio
+  - streamlit
+  - ipykernel
+  - pip
+  - pip:
+    - opencv-python-headless
+    - opencv-contrib-python-headless
+    - streamlit-extras
+    - streamlit-folium
+

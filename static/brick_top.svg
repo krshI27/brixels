@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="50px"
+   height="50px"
+   viewBox="0 0 55 55"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     id="layer1">
+    <rect
+       style="fill:#800000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       id="square"
+       width="49"
+       height="49"
+       x="5.5"
+       y="5.5" />
+    <path
+       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:71;stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       d="M 30,30 25,25"
+       id="circle_height" />
+    <rect
+       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       id="square"
+       width="49"
+       height="49"
+       x="0.5"
+       y="0.5" />
+    <circle
+       style="fill:#800000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       id="circle_base"
+       cx="25"
+       cy="25"
+       r="14.5" />
+    <path
+       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:30;stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       d="M 25,25 20,20"
+       id="circle_height" />
+    <circle
+       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+       id="circle_top"
+       cx="20"
+       cy="20"
+       r="14.5" />
+  </g>
+</svg>
