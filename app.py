@@ -1,11 +1,16 @@
+import json
 import os
 import random
+import time
+from urllib.request import urlopen
 
 import folium
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
+import urllib3
 from pyproj import CRS
 from shapely import box
 from shapely.geometry import Point
@@ -19,11 +24,48 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
 with open("static/style.css") as css:
     st.markdown(
         f"<style>{css.read()}</style>",
         unsafe_allow_html=True,
     )
+
+
+def elevation_request(url: str, location: str) -> json:
+    """
+    Makes the remote request
+    Continues making attempts until it succeeds
+    """
+
+    count = 1
+    while True:
+        try:
+            response = urlopen(url + location).read().decode("utf-8")
+        except (OSError, urllib3.exceptions.ProtocolError) as error:
+            print("\n")
+            print("*" * 20, "Error Occured", "*" * 20)
+            print(f"Number of tries: {count}")
+            print(f"URL: {url}")
+            print(error)
+            print("\n")
+            count += 1
+            time.sleep(5)
+            continue
+        break
+
+    return response
+
+
+def get_elevation(x):
+    elevations = []
+    url = "https://api.open-elevation.com/api/v1/lookup?locations="
+    for lat, lon in x:
+        location = f"{lat},{lon}"
+        response = elevation_request(url, location)
+        response = json.loads(response)
+        elevations.append(response["results"][0]["elevation"])
+    return elevations
 
 
 def traverse(d):
@@ -50,15 +92,15 @@ def create_grid(bounds, brick_size, map_width, map_height):
     y_step = y_range / (map_height / brick_size)
 
     x_points = np.arange(x_min, x_max + x_step, x_step)
-    y_points = np.arange(y_min, y_max + y_step, y_step)
+    y_points = np.arange(y_min, y_max + y_step, y_step)[::-1]
 
-    grid_points = [(x, y) for x in x_points[::-1] for y in y_points[::-1]]
+    grid_points = [(x, y) for x in x_points for y in y_points]
     return grid_points
 
 
 icon_path = "static/brick_top.png"
 
-brick_size = 50
+brick_size = 10
 map_width = 1000
 map_height = 500
 CENTER_START = [0, 0]
@@ -88,26 +130,27 @@ m.fit_bounds([sw, ne])
 
 feature_group = folium.map.FeatureGroup(name="Points")
 
-
 if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
     bounding_box = box(x_min, y_min, x_max, y_max)
     gdf = gpd.GeoDataFrame(geometry=[bounding_box], crs=CRS.from_epsg(4326))
     gdf = gdf.to_crs(epsg=3857)
     bounds = gdf.total_bounds
-    grid = create_grid(bounds, brick_size, map_width, map_height)
-    grid = gpd.GeoDataFrame(
-        geometry=[Point(x, y) for x, y in grid], crs=CRS.from_epsg(3857)
+    # grid = create_grid(bounds, brick_size, map_width, map_height)
+    # grid = gpd.GeoDataFrame(
+    #     geometry=[Point(x, y) for x, y in grid], crs=CRS.from_epsg(3857)
+    # )
+    grid = gpd.read_file(
+        "/data/brixels_world_512000-008000.gpkg",
+        layer="brixels_world_128000",
+        bbox=tuple(bounds),
     )
     grid = grid.to_crs(epsg=4326)
     grid_list = [[point.xy[1][0], point.xy[0][0]] for point in grid.geometry]
-    grid_list = [
-        (point[0] - i * 0.005, point[1] - i * 0.005)
-        for i, point in enumerate(grid_list)
-    ]
-    for point in grid_list:
+    elevation = grid["elevation_trim"].values
+    for point, elev in zip(grid_list, elevation):
         marker = folium.Marker(
-            point,
+            (point[0] + elev / 10000, point[1] - elev / 10000),
             # icon=folium.features.CustomIcon(
             #     icon_image=icon_path, icon_size=[brick_size, brick_size]
             # ),
@@ -116,8 +159,8 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
             # ),
             icon=folium.DivIcon(
                 html=f"""<div><svg
-   width="50px"
-   height="50px"
+   width="25px"
+   height="25px"
    viewBox="0 0 50 50"
    version="1.1"
    id="svg1"
