@@ -103,8 +103,9 @@ icon_path = "static/brick_top.png"
 brick_size = 10
 map_width = 1000
 map_height = 500
+min_zoom = 2
 CENTER_START = [0, 0]
-ZOOM_START = 10
+ZOOM_START = 5
 
 
 if "bounds" not in st.session_state:
@@ -112,6 +113,8 @@ if "bounds" not in st.session_state:
         "_southWest": {"lat": -85.06, "lng": -180},
         "_northEast": {"lat": 85.06, "lng": 180},
     }
+if "zoom" not in st.session_state:
+    st.session_state["zoom"] = ZOOM_START
 
 m = folium.Map(
     location=CENTER_START,
@@ -121,7 +124,7 @@ m = folium.Map(
     min_lon=-180,
     max_lon=180,
     max_bounds=True,
-    min_zoom=2,
+    min_zoom=min_zoom,
     max_zoom=7,
 )
 sw = [-85.06, -180]
@@ -142,60 +145,84 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     # )
     grid = gpd.read_file(
         "/data/brixels_world_512000-008000.gpkg",
-        layer="brixels_world_128000",
+        layer="brixels_world_256000",
         bbox=tuple(bounds),
     )
+    grid["x"] = grid.geometry.x
+    grid["y"] = grid.geometry.y
+    grid["color_hex"] = (
+        ((grid["color"] + 100) / 200 * 255)
+        .astype(int)
+        .apply(lambda x: f"#{x:02x}{x:02x}{x:02x}")
+    )
+    grid["color_lgt_hex"] = (
+        ((grid["color"] + 100) / 200 * 230 + 25)
+        .astype(int)
+        .apply(lambda x: f"#{x:02x}{x:02x}{x:02x}")
+    )
+    grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
     grid = grid.to_crs(epsg=4326)
     grid_list = [[point.xy[1][0], point.xy[0][0]] for point in grid.geometry]
     elevation = grid["elevation_trim"].values
-    for point, elev in zip(grid_list, elevation):
+    color = grid["color_hex"].values
+    color_lgt = grid["color_lgt_hex"].values
+    zoom = (2 ** st.session_state["zoom"]) / 30
+    for point, elev, col, col_lgt in zip(grid_list, elevation, color, color_lgt):
+        elev /= 200
+        # elev += 1
         marker = folium.Marker(
-            (point[0] + elev / 10000, point[1] - elev / 10000),
-            # icon=folium.features.CustomIcon(
-            #     icon_image=icon_path, icon_size=[brick_size, brick_size]
-            # ),
-            # icon=folium.DivIcon(
-            #     html=f"""<div><svg height="50" width="50"><path d="m 10 25 a 15 15 0 0 0 30 0 a 15 15 0 0 0 -30 0 z " stroke="black"  fill="white" /></svg></div>"""
-            # ),
+            point,
             icon=folium.DivIcon(
+                icon_anchor=(elev * zoom, elev * zoom),
                 html=f"""<div><svg
-   width="25px"
-   height="25px"
-   viewBox="0 0 50 50"
-   version="1.1"
-   id="svg1"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg">
-  <defs
-     id="defs1" />
-  <g
-     id="layer1">
-    <rect
-       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-       id="square"
-       width="49"
-       height="49"
-       x="0.5"
-       y="0.5" />
-    <circle
-       style="fill:#800000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-       id="circle_base"
-       cx="25"
-       cy="25"
-       r="14.5" />
-    <path
-       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:30;stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-       d="M 25,25 20,20"
-       id="circle_height" />
-    <circle
-       style="fill:#ff0000;fill-opacity:1;stroke:#800000;stroke-width:1;stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-       id="circle_top"
-       cx="20"
-       cy="20"
-       r="14.5" />
-  </g>
-</svg>
-</div>"""
+       width="{zoom*(55+elev)}px"
+       height="{zoom*(55+elev)}px"
+       viewBox="0 0 {zoom*(55+elev)} {zoom*(55+elev)}"
+       version="1.1"
+       id="svg1"
+       xmlns="http://www.w3.org/2000/svg"
+       xmlns:svg="http://www.w3.org/2000/svg">
+      <defs
+         id="defs1" />
+      <g
+         id="layer1">
+        <rect
+           style="fill:{col};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="square"
+           width="{zoom*49}"
+           height="{zoom*49}"
+           x="{zoom*(5.5+elev)}"
+           y="{zoom*(5.5+elev)}" />
+        <path
+           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{np.sqrt(2*((zoom*50)**2))};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           d="M {zoom*25},{zoom*25} {zoom*(30+elev)},{zoom*(30+elev)}"
+           id="circle_height" />
+        <rect
+           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="square"
+           width="{zoom*49}"
+           height="{zoom*49}"
+           x="{zoom*0.5}"
+           y="{zoom*0.5}" />
+        <circle
+           style="fill:{col};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="circle_base"
+           cx="{zoom*25}"
+           cy="{zoom*25}"
+           r="{zoom*14.5}" />
+        <path
+           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*30};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           d="M {zoom*25},{zoom*25} {zoom*20},{zoom*20}"
+           id="circle_height" />
+        <circle
+           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="circle_top"
+           cx="{zoom*20}"
+           cy="{zoom*20}"
+           r="{zoom*14.5}" />
+      </g>
+    </svg>
+    </div>""",
             ),
         )
         feature_group.add_child(marker)
@@ -210,5 +237,6 @@ map_meta = st_folium(
 if st.session_state["bounds"] != map_meta["bounds"]:
 
     st.session_state["bounds"] = map_meta["bounds"]
+    st.session_state["zoom"] = map_meta["zoom"]
     st.rerun()
 np.sqrt(50)
