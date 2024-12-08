@@ -133,6 +133,107 @@ m.fit_bounds([sw, ne])
 
 feature_group = folium.map.FeatureGroup(name="Points")
 
+class BrickIcon:
+    def __init__(self, zoom, elevation, color, color_shadow):
+        self.zoom = zoom
+        self.elevation = elevation
+        self.color = color
+        self.color_shadow = color_shadow
+        self.size = 55 + elevation
+
+    def _create_base_square(self):
+        return f"""<rect
+           style="fill:{self.color_shadow};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{self.zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="square"
+           width="{self.zoom*49}"
+           height="{self.zoom*49}"
+           x="{self.zoom*(5.5+self.elevation)}"
+           y="{self.zoom*(5.5+self.elevation)}" />"""
+
+    def _create_square_height(self):
+        return f"""<path
+           style="fill:{self.color};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{np.sqrt(2*((self.zoom*50)**2))};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           d="M {self.zoom*25},{self.zoom*25} {self.zoom*(30+self.elevation)},{self.zoom*(30+self.elevation)}"
+           id="circle_height" />"""
+
+    def _create_top_square(self):
+        return f"""<rect
+           style="fill:{self.color};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{self.zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="square"
+           width="{self.zoom*49}"
+           height="{self.zoom*49}"
+           x="{self.zoom*0.5}"
+           y="{self.zoom*0.5}" />"""
+
+    def _create_base_circle(self):
+        return f"""<circle
+           style="fill:{self.color_shadow};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{self.zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="circle_base"
+           cx="{self.zoom*25}"
+           cy="{self.zoom*25}"
+           r="{self.zoom*14.5}" />"""
+
+    def _create_circle_height(self):
+        return f"""<path
+           style="fill:{self.color};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{self.zoom*30};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           d="M {self.zoom*25},{self.zoom*25} {self.zoom*20},{self.zoom*20}"
+           id="circle_height" />"""
+
+    def _create_top_circle(self):
+        return f"""<circle
+           style="fill:{self.color};fill-opacity:1;stroke:{self.color_shadow};stroke-width:{self.zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+           id="circle_top"
+           cx="{self.zoom*20}"
+           cy="{self.zoom*20}"
+           r="{self.zoom*14.5}" />"""
+
+    def generate_svg(self):
+        return f"""<div><svg
+       width="{self.zoom*self.size}px"
+       height="{self.zoom*self.size}px"
+       viewBox="0 0 {self.zoom*self.size} {self.zoom*self.size}"
+       version="1.1"
+       id="svg1"
+       xmlns="http://www.w3.org/2000/svg"
+       xmlns:svg="http://www.w3.org/2000/svg">
+      <defs id="defs1" />
+      <g id="layer1">
+        {self._create_base_square()}
+        {self._create_square_height()}
+        {self._create_top_square()}
+        {self._create_base_circle()}
+        {self._create_circle_height()}
+        {self._create_top_circle()}
+      </g>
+    </svg></div>"""
+
+class ColorUtils:
+    @staticmethod
+    def _ensure_rgb(value):
+        """Convert single value to RGB tuple by repeating the value"""
+        if isinstance(value, (int, float)):
+            return (value, value, value)
+        return value
+
+    @staticmethod
+    def to_hex(r, g=None, b=None):
+        """Convert RGB values to hex color string"""
+        if g is None and b is None:
+            r, g, b = ColorUtils._ensure_rgb(r)
+        return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
+
+    @classmethod
+    def create_color_pair(cls, value, base_range=(0, 255), shadow_factor=0.75):
+        """Create a pair of colors (base, shadow) from input value"""
+        # Normalize value to 0-255 range
+        base_min, base_max = base_range
+        normalized = (value - base_min) / (base_max - base_min) * 255
+        
+        # Create slightly lighter shadow version
+        shadow = int(min(normalized * shadow_factor, 255))
+        
+        return cls.to_hex(normalized), cls.to_hex(shadow)
+
 if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
     bounding_box = box(x_min, y_min, x_max, y_max)
@@ -150,79 +251,28 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     )
     grid["x"] = grid.geometry.x
     grid["y"] = grid.geometry.y
-    grid["color_hex"] = (
-        ((grid["color"] + 100) / 200 * 255)
-        .astype(int)
-        .apply(lambda x: f"#{x:02x}{x:02x}{x:02x}")
+    
+    # Replace the separate color calculations with ColorUtils
+    grid[["color", "color_shadow"]] = (
+        grid["elevation"]
+        .apply(lambda x: pd.Series(ColorUtils.create_color_pair(x, base_range=(grid["elevation"].min(), grid["elevation"].max()))))
     )
-    grid["color_lgt_hex"] = (
-        ((grid["color"] + 100) / 200 * 230 + 25)
-        .astype(int)
-        .apply(lambda x: f"#{x:02x}{x:02x}{x:02x}")
-    )
+    
     grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
     grid = grid.to_crs(epsg=4326)
     grid_list = [[point.xy[1][0], point.xy[0][0]] for point in grid.geometry]
     elevation = grid["elevation_trim"].values
-    color = grid["color_hex"].values
-    color_lgt = grid["color_lgt_hex"].values
+    color = grid["color"].values
+    color_shadow = grid["color_shadow"].values
     zoom = (2 ** st.session_state["zoom"]) / 30
-    for point, elev, col, col_lgt in zip(grid_list, elevation, color, color_lgt):
+    for point, elev, col, col_shd in zip(grid_list, elevation, color, color_shadow):
         elev /= 200
-        # elev += 1
+        brick_icon = BrickIcon(zoom, elev, col, col_shd)
         marker = folium.Marker(
             point,
             icon=folium.DivIcon(
                 icon_anchor=(elev * zoom, elev * zoom),
-                html=f"""<div><svg
-       width="{zoom*(55+elev)}px"
-       height="{zoom*(55+elev)}px"
-       viewBox="0 0 {zoom*(55+elev)} {zoom*(55+elev)}"
-       version="1.1"
-       id="svg1"
-       xmlns="http://www.w3.org/2000/svg"
-       xmlns:svg="http://www.w3.org/2000/svg">
-      <defs
-         id="defs1" />
-      <g
-         id="layer1">
-        <rect
-           style="fill:{col};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           id="square"
-           width="{zoom*49}"
-           height="{zoom*49}"
-           x="{zoom*(5.5+elev)}"
-           y="{zoom*(5.5+elev)}" />
-        <path
-           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{np.sqrt(2*((zoom*50)**2))};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           d="M {zoom*25},{zoom*25} {zoom*(30+elev)},{zoom*(30+elev)}"
-           id="circle_height" />
-        <rect
-           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           id="square"
-           width="{zoom*49}"
-           height="{zoom*49}"
-           x="{zoom*0.5}"
-           y="{zoom*0.5}" />
-        <circle
-           style="fill:{col};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           id="circle_base"
-           cx="{zoom*25}"
-           cy="{zoom*25}"
-           r="{zoom*14.5}" />
-        <path
-           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*30};stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           d="M {zoom*25},{zoom*25} {zoom*20},{zoom*20}"
-           id="circle_height" />
-        <circle
-           style="fill:{col_lgt};fill-opacity:1;stroke:{col};stroke-width:{zoom*1};stroke-linecap:square;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
-           id="circle_top"
-           cx="{zoom*20}"
-           cy="{zoom*20}"
-           r="{zoom*14.5}" />
-      </g>
-    </svg>
-    </div>""",
+                html=brick_icon.generate_svg(),
             ),
         )
         feature_group.add_child(marker)
