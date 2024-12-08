@@ -3,6 +3,7 @@ import os
 import random
 import time
 from urllib.request import urlopen
+from dataclasses import dataclass
 
 import folium
 import geopandas as gpd
@@ -97,16 +98,28 @@ def create_grid(bounds, brick_size, map_width, map_height):
     grid_points = [(x, y) for x in x_points for y in y_points]
     return grid_points
 
+    
+grid_size_dict = {
+    1: 512000,
+    2: 512000,
+    3: 256000,
+    4: 128000,
+    5: 64000,
+    6: 32000,
+    7: 16000,
+    8: 8000,
+}
 
 icon_path = "static/brick_top.png"
 
 brick_size = 10
 map_width = 1000
 map_height = 500
-min_zoom = 2
+min_zoom = 1
+max_zoom = 8
 CENTER_START = [0, 0]
-ZOOM_START = 5
-
+ZOOM_START = 1
+ELEVATION_FRACTION = 50
 
 if "bounds" not in st.session_state:
     st.session_state["bounds"] = {
@@ -125,7 +138,7 @@ m = folium.Map(
     max_lon=180,
     max_bounds=True,
     min_zoom=min_zoom,
-    max_zoom=7,
+    max_zoom=max_zoom,
 )
 sw = [-85.06, -180]
 ne = [85.06, 180]
@@ -234,24 +247,43 @@ class ColorUtils:
         
         return cls.to_hex(normalized), cls.to_hex(shadow)
 
+
+def calculate_zoom_divisor(grid_size: int) -> float:
+    """Calculate the zoom divisor based on grid size
+    Reference:  512000m -> 15
+                256000m -> 30
+                128000m -> 60
+    Formula: divisor = 30 * (256000/grid_size)
+    """
+    return 15 * (512000/grid_size)
+
 if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
-    y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
+    if st.session_state["zoom"] == 1:
+        y_min, x_min, y_max, x_max = -85.06, -180, 85.06, 180
+    else:
+        y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
     bounding_box = box(x_min, y_min, x_max, y_max)
     gdf = gpd.GeoDataFrame(geometry=[bounding_box], crs=CRS.from_epsg(4326))
     gdf = gdf.to_crs(epsg=3857)
     bounds = gdf.total_bounds
+    grid_size =  grid_size_dict[st.session_state['zoom']] # Use the dataclass constant
+
     # grid = create_grid(bounds, brick_size, map_width, map_height)
     # grid = gpd.GeoDataFrame(
     #     geometry=[Point(x, y) for x, y in grid], crs=CRS.from_epsg(3857)
     # )
+    layer_name = f"brixels_world_{grid_size:06d}"
     grid = gpd.read_file(
         "/data/brixels_world_512000-008000.gpkg",
-        layer="brixels_world_256000",
+        layer=layer_name,
         bbox=tuple(bounds),
     )
     grid["x"] = grid.geometry.x
     grid["y"] = grid.geometry.y
     
+    zoom_divisor = calculate_zoom_divisor(grid_size)
+    zoom = (2 ** st.session_state["zoom"]) / zoom_divisor
+
     # Replace the separate color calculations with ColorUtils
     grid[["color", "color_shadow"]] = (
         grid["elevation"]
@@ -264,9 +296,8 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     elevation = grid["elevation_trim"].values
     color = grid["color"].values
     color_shadow = grid["color_shadow"].values
-    zoom = (2 ** st.session_state["zoom"]) / 30
     for point, elev, col, col_shd in zip(grid_list, elevation, color, color_shadow):
-        elev /= 200
+        elev /= ELEVATION_FRACTION
         brick_icon = BrickIcon(zoom, elev, col, col_shd)
         marker = folium.Marker(
             point,
