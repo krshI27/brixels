@@ -33,41 +33,6 @@ with open("static/style.css") as css:
     )
 
 
-def elevation_request(url: str, location: str) -> json:
-    """
-    Makes the remote request
-    Continues making attempts until it succeeds
-    """
-
-    count = 1
-    while True:
-        try:
-            response = urlopen(url + location).read().decode("utf-8")
-        except (OSError, urllib3.exceptions.ProtocolError) as error:
-            print("\n")
-            print("*" * 20, "Error Occured", "*" * 20)
-            print(f"Number of tries: {count}")
-            print(f"URL: {url}")
-            print(error)
-            print("\n")
-            count += 1
-            time.sleep(5)
-            continue
-        break
-
-    return response
-
-
-def get_elevation(x):
-    elevations = []
-    url = "https://api.open-elevation.com/api/v1/lookup?locations="
-    for lat, lon in x:
-        location = f"{lat},{lon}"
-        response = elevation_request(url, location)
-        response = json.loads(response)
-        elevations.append(response["results"][0]["elevation"])
-    return elevations
-
 
 def traverse(d):
     for key, val in d.items():
@@ -102,15 +67,19 @@ def create_grid(bounds, brick_size, map_width, map_height):
 grid_size_dict = {
     1: 512000,
     2: 512000,
-    3: 256000,
-    4: 128000,
-    5: 64000,
-    6: 32000,
-    7: 16000,
-    8: 8000,
+    3: 512000,
+    4: 512000,
+    5: 512000,
+    6: 512000,
+    7: 512000,
+    8: 512000,
+    # 3: 256000,
+    # 4: 128000,
+    # 5: 64000,
+    # 6: 32000,
+    # 7: 16000,
+    # 8: 8000,
 }
-
-icon_path = "static/brick_top.png"
 
 brick_size = 10
 map_width = 1000
@@ -119,7 +88,7 @@ min_zoom = 1
 max_zoom = 8
 CENTER_START = [0, 0]
 ZOOM_START = 1
-ELEVATION_FRACTION = 50
+ELEVATION_FRACTION = 10000
 
 if "bounds" not in st.session_state:
     st.session_state["bounds"] = {
@@ -293,16 +262,18 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
     grid = grid.to_crs(epsg=4326)
     grid_list = [[point.xy[1][0], point.xy[0][0]] for point in grid.geometry]
-    elevation = grid["elevation_trim"].values
+    elevation = grid["elevation_quant"].values
     color = grid["color"].values
     color_shadow = grid["color_shadow"].values
     for point, elev, col, col_shd in zip(grid_list, elevation, color, color_shadow):
         elev /= ELEVATION_FRACTION
         brick_icon = BrickIcon(zoom, elev, col, col_shd)
+        anchor_shift = elev * zoom
+        icon_anchor = (anchor_shift, anchor_shift)
         marker = folium.Marker(
             point,
             icon=folium.DivIcon(
-                icon_anchor=(elev * zoom, elev * zoom),
+                icon_anchor=icon_anchor,
                 html=brick_icon.generate_svg(),
             ),
         )
