@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import colorsys
 
 os.chdir(os.path.dirname(__file__))
+from cmaps import cm_ocean, cm_terrain
 st.set_page_config(
     page_title="Brixels",
     page_icon="🧱",
@@ -44,6 +45,9 @@ grid_size_dict = {
     6: 32000,
     7: 16000,
     8: 8000,
+    9: 8000,
+    10: 8000,
+    11: 8000,
 }
 brick_size = 10
 win_width = streamlit_js_eval(
@@ -57,10 +61,26 @@ else:
     map_width = 100
     map_height = 100
 min_zoom = 1
-max_zoom = 8
+max_zoom = 11
 CENTER_START = [0, 0]
 ZOOM_START = 1
 ELEVATION_FRACTION = 12800
+
+
+# Define the colormaps for negative and positive values
+cmap_neg = plt.cm.Blues_r  # Shades of blue for negative values
+cmap_neg = mc.ListedColormap(cm_ocean/255.0)
+
+# cmap_pos = mc.LinearSegmentedColormap.from_list(
+#     'custom_pos', ['blue', 'green', 'yellow', 'orange', 'grey', 'white']
+# )
+cmap_pos = plt.cm.Reds_r
+cmap_pos = mc.ListedColormap(cm_terrain/255.0)
+# Combine the two colormaps into one
+cmap_combined = mc.LinearSegmentedColormap.from_list(
+    'custom_combined',
+    [(0, cmap_neg(0.0)), (0.5, cmap_neg(1.0)), (0.5, cmap_pos(0.0)), (1.0, cmap_pos(1.0))]
+)
 
 
 def traverse(d):
@@ -267,13 +287,21 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     zoom_divisor = calculate_zoom_divisor(grid_size)
     zoom = (2 ** st.session_state["zoom"]) / zoom_divisor
     # Normalize elevation data
-    norm = plt.Normalize(vmin=grid["elevation"].min(), vmax=grid["elevation"].max())
-    # Map elevation to colormap
-    cmap = plt.cm.viridis
-
-    # Apply colormap to elevation data
+    if grid["elevation"].min() < 0:
+        norm = mc.TwoSlopeNorm(vmin=grid["elevation"].min(), vcenter=0, vmax=grid["elevation"].max())
+        cmap_combined = mc.LinearSegmentedColormap.from_list(
+            'cmap_combined',
+            [cmap_neg(i) for i in range(cmap_neg.N)] + [cmap_pos(i) for i in range(cmap_pos.N)]
+        )
+    else:   
+        norm = mc.AsinhNorm(vmin=grid["elevation"].min(), vmax=grid["elevation"].max())
+        cmap_combined = mc.LinearSegmentedColormap.from_list(
+            'cmap_combined',
+            [cmap_pos(i) for i in range(cmap_pos.N)]
+        )
+    # Apply the combined colormap to elevation data
     grid[["r", "g", "b", "a"]] = grid["elevation"].apply(
-        lambda x: pd.Series(cmap(norm(x)))
+        lambda x: pd.Series(cmap_combined(norm(x)))
     )
     # Use the r, g, b values as input for create_color_pair method
     grid["color"] = grid.apply(
@@ -289,12 +317,13 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
     grid = grid.to_crs(epsg=4326)
     grid_list = [[point.xy[1][0], point.xy[0][0]] for point in grid.geometry]
-    elevation = grid["elevation_quant"].values / ELEVATION_FRACTION
+    elevation = grid["elevation"].values
+    elev_min = 0
+    elev_max = np.max(elevation)
+    elevation = 10 * np.round(10 * ((elevation - elev_min) / elev_max))
     color = grid["color"].values
     color_shadow = grid["color_shadow"].values
-    elev_min = 0
-    elev_max = grid["elevation"].max()
-    # eleation = np.round(10 * ((elevation - elev_min) / elev_max))
+
     for point, elev, col, col_shd in zip(grid_list, elevation, color, color_shadow):
         if elev < 10:
             elev = 10
