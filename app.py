@@ -17,6 +17,10 @@ from shapely import box
 from shapely.geometry import Point
 from streamlit_folium import st_folium
 from streamlit_js_eval import streamlit_js_eval
+import matplotlib.colors as mc
+import matplotlib.pyplot as plt
+
+import colorsys
 
 os.chdir(os.path.dirname(__file__))
 st.set_page_config(
@@ -221,7 +225,6 @@ def adjust_lightness(color, amount=0.5):
     return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
 
 
-import colorsys
 
 
 def scale_lightness(rgb, scale_l):
@@ -242,6 +245,7 @@ def calculate_zoom_divisor(grid_size: int) -> float:
 
 
 if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
+    grid_size = grid_size_dict[st.session_state["zoom"]]  # Use the dataclass constant
     y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
     if x_min < -180:
         x_min = -180
@@ -251,12 +255,6 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     gdf = gpd.GeoDataFrame(geometry=[bounding_box], crs=CRS.from_epsg(4326))
     gdf = gdf.to_crs(epsg=3857)
     bounds = gdf.total_bounds
-    grid_size = grid_size_dict[st.session_state["zoom"]]  # Use the dataclass constant
-
-    # grid = create_grid(bounds, brick_size, map_width, map_height)
-    # grid = gpd.GeoDataFrame(
-    #     geometry=[Point(x, y) for x, y in grid], crs=CRS.from_epsg(3857)
-    # )
     layer_name = f"brixels_world_{grid_size:06d}"
     grid = gpd.read_file(
         "/data/brixels_world_512000-008000.gpkg",
@@ -268,17 +266,6 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
 
     zoom_divisor = calculate_zoom_divisor(grid_size)
     zoom = (2 ** st.session_state["zoom"]) / zoom_divisor
-    # Replace the separate color calculations with ColorUtils
-    # grid[["color", "color_shadow"]] = grid["elevation"].apply(
-    #     lambda x: pd.Series(
-    #         ColorUtils.create_color_pair(
-    #             x, base_range=(grid["elevation"].min(), grid["elevation"].max())
-    #         )
-    #     )
-    # )
-    import matplotlib.colors as mc
-    import matplotlib.pyplot as plt
-
     # Normalize elevation data
     norm = plt.Normalize(vmin=grid["elevation"].min(), vmax=grid["elevation"].max())
     # Map elevation to colormap
@@ -326,8 +313,9 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
 map_meta = st_folium(
     m,
     feature_group_to_add=feature_group,
-    width=map_width,
-    height=map_height,
+    use_container_width=True,
+    #width=map_width,
+    #height=map_height,
 )
 
 if (
@@ -338,4 +326,3 @@ if (
     st.session_state["bounds"] = map_meta["bounds"]
     st.session_state["zoom"] = map_meta["zoom"]
     st.rerun()
-np.sqrt(50)
