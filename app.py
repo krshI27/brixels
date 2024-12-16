@@ -1,29 +1,20 @@
-import json
+import colorsys
 import os
-import random
-import time
-from dataclasses import dataclass
-from urllib.request import urlopen
 
 import folium
 import geopandas as gpd
+import matplotlib.colors as mc
 import numpy as np
 import pandas as pd
-import requests
 import streamlit as st
-import urllib3
 from pyproj import CRS
 from shapely import box
-from shapely.geometry import Point
 from streamlit_folium import st_folium
 from streamlit_js_eval import streamlit_js_eval
-import matplotlib.colors as mc
-import matplotlib.pyplot as plt
-
-import colorsys
 
 os.chdir(os.path.dirname(__file__))
-from cmaps import cm_ocean, cm_terrain
+from cmaptools import joincmap, readcpt
+
 st.set_page_config(
     page_title="Brixels",
     page_icon="🧱",
@@ -49,7 +40,7 @@ grid_size_dict = {
     10: 8000,
     11: 8000,
 }
-brick_size = 10
+
 win_width = streamlit_js_eval(
     js_expressions="window.innerWidth",
     key="SCR",
@@ -66,52 +57,9 @@ CENTER_START = [0, 0]
 ZOOM_START = 1
 ELEVATION_FRACTION = 12800
 
-
-# Define the colormaps for negative and positive values
-cmap_neg = plt.cm.Blues_r  # Shades of blue for negative values
-cmap_neg = mc.ListedColormap(cm_ocean/255.0)
-
-# cmap_pos = mc.LinearSegmentedColormap.from_list(
-#     'custom_pos', ['blue', 'green', 'yellow', 'orange', 'grey', 'white']
-# )
-cmap_pos = plt.cm.Reds_r
-cmap_pos = mc.ListedColormap(cm_terrain/255.0)
-# Combine the two colormaps into one
-cmap_combined = mc.LinearSegmentedColormap.from_list(
-    'custom_combined',
-    [(0, cmap_neg(0.0)), (0.5, cmap_neg(1.0)), (0.5, cmap_pos(0.0)), (1.0, cmap_pos(1.0))]
-)
-
-
-def traverse(d):
-    for key, val in d.items():
-        if isinstance(val, dict):
-            yield from traverse(val)
-        else:
-            yield val
-
-
-def unpack_bounds(bounds):
-    sw = bounds["_southWest"]
-    ne = bounds["_northEast"]
-    return sw["lat"], sw["lng"], ne["lat"], ne["lng"]
-
-
-def create_grid(bounds, brick_size, map_width, map_height):
-    x_min, y_min, x_max, y_max = bounds
-
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-
-    x_step = x_range / (map_width / brick_size)
-    y_step = y_range / (map_height / brick_size)
-
-    x_points = np.arange(x_min, x_max + x_step, x_step)
-    y_points = np.arange(y_min, y_max + y_step, y_step)[::-1]
-
-    grid_points = [(x, y) for x in x_points for y in y_points]
-    return grid_points
-
+cmap_neg = readcpt("cpt/gmt/nighttime_low.cpt")
+cmap_pos = readcpt("cpt/gmt/nighttime_high.cpt")
+cmap_combined = joincmap(cmap_neg, cmap_pos)
 
 if "bounds" not in st.session_state:
     st.session_state["bounds"] = {
@@ -121,22 +69,13 @@ if "bounds" not in st.session_state:
 if "zoom" not in st.session_state:
     st.session_state["zoom"] = ZOOM_START
 
-m = folium.Map(
-    location=CENTER_START,
-    zoom_start=ZOOM_START,
-    min_lat=-85.06,
-    max_lat=85.06,
-    min_lon=-180,
-    max_lon=180,
-    max_bounds=True,
-    min_zoom=min_zoom,
-    max_zoom=max_zoom,
-)
-# sw = [-85.06, -180]
-# ne = [85.06, 180]
-# m.fit_bounds([sw, ne])
 
-feature_group = folium.map.FeatureGroup(name="Points")
+def traverse(d):
+    for key, val in d.items():
+        if isinstance(val, dict):
+            yield from traverse(val)
+        else:
+            yield val
 
 
 class BrickIcon:
@@ -210,48 +149,11 @@ class BrickIcon:
         </svg></div>"""
 
 
-class ColorUtils:
-    @staticmethod
-    def _ensure_rgb(value):
-        """Convert single value to RGB tuple by repeating the value"""
-        if isinstance(value, (int, float)):
-            return (value, value, value)
-        return value
-
-    @staticmethod
-    def to_hex(r, g=None, b=None):
-        """Convert RGB values to hex color string"""
-        if g is None and b is None:
-            r, g, b = ColorUtils._ensure_rgb(r)
-        return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
-
-    @classmethod
-    def create_color_pair(cls, value, base_range=(0, 255), shadow_factor=0.75):
-        """Create a pair of colors (base, shadow) from input value"""
-        # Normalize value to 0-255 range
-        base_min, base_max = base_range
-        normalized = (value - base_min) / (base_max - base_min) * 255
-
-        # Create slightly lighter shadow version
-        shadow = int(min(normalized * shadow_factor, 255))
-
-        return cls.to_hex(normalized), cls.to_hex(shadow)
-
-
-def adjust_lightness(color, amount=0.5):
-    import colorsys
-
-    c = colorsys.rgb_to_hls(*color)
-    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
-
-
-
-
-def scale_lightness(rgb, scale_l):
+def scale_lightness(rgb, scale):
     # convert rgb to hls
     h, l, s = colorsys.rgb_to_hls(*rgb)
     # manipulate h, l, s values and return as rgb
-    return colorsys.hls_to_rgb(h, min(1, l * scale_l), s=s)
+    return colorsys.hls_to_rgb(h, min(1, l * scale), s=min(1, s * scale**2))
 
 
 def calculate_zoom_divisor(grid_size: int) -> float:
@@ -263,6 +165,20 @@ def calculate_zoom_divisor(grid_size: int) -> float:
     """
     return 15 * (512000 / grid_size)
 
+
+m = folium.Map(
+    location=CENTER_START,
+    zoom_start=ZOOM_START,
+    min_lat=-85.06,
+    max_lat=85.06,
+    min_lon=-180,
+    max_lon=180,
+    max_bounds=True,
+    min_zoom=min_zoom,
+    max_zoom=max_zoom,
+)
+
+feature_group = folium.map.FeatureGroup(name="Points")
 
 if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
     grid_size = grid_size_dict[st.session_state["zoom"]]  # Use the dataclass constant
@@ -286,23 +202,13 @@ if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
 
     zoom_divisor = calculate_zoom_divisor(grid_size)
     zoom = (2 ** st.session_state["zoom"]) / zoom_divisor
-    # Normalize elevation data
-    if grid["elevation"].min() < 0:
-        norm = mc.TwoSlopeNorm(vmin=grid["elevation"].min(), vcenter=0, vmax=grid["elevation"].max())
-        cmap_combined = mc.LinearSegmentedColormap.from_list(
-            'cmap_combined',
-            [cmap_neg(i) for i in range(cmap_neg.N)] + [cmap_pos(i) for i in range(cmap_pos.N)]
-        )
-    else:   
-        norm = mc.AsinhNorm(vmin=grid["elevation"].min(), vmax=grid["elevation"].max())
-        cmap_combined = mc.LinearSegmentedColormap.from_list(
-            'cmap_combined',
-            [cmap_pos(i) for i in range(cmap_pos.N)]
-        )
+
+    norm = mc.TwoSlopeNorm(vmin=-8000, vcenter=0, vmax=8000)
     # Apply the combined colormap to elevation data
     grid[["r", "g", "b", "a"]] = grid["elevation"].apply(
         lambda x: pd.Series(cmap_combined(norm(x)))
     )
+
     # Use the r, g, b values as input for create_color_pair method
     grid["color"] = grid.apply(
         lambda row: pd.Series(mc.to_hex((row["r"], row["g"], row["b"]))),
@@ -343,8 +249,8 @@ map_meta = st_folium(
     m,
     feature_group_to_add=feature_group,
     use_container_width=True,
-    #width=map_width,
-    #height=map_height,
+    # width=map_width,
+    # height=map_height,
 )
 
 if (

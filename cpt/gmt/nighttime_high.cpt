@@ -1,0 +1,15 @@
+#
+# gmt/geo : Colors for global bathymetry/topography relief [R=-8000/8000, H, C=RGB]
+# Color table for Earth's relief combining the gebco
+# and dem1 CPTs with a hard hinge at 0.
+# Designed by P. Wessel, SOEST
+#------------------------------------------------
+# COLOR_MODEL = RGB
+# RANGE = 0/1
+#------------------------------------------------
+0   134/140/63  1   255/230/230
+#----------------------------------------------------------
+N 255/230/230
+F 255/230/230
+B 134/140/63
+#----------------------------------------------------------
