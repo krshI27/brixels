@@ -30,19 +30,21 @@ with open("static/style.css") as css:
         unsafe_allow_html=True,
     )
 
-grid_size_dict = {
-    1: 512000,
-    2: 512000,
-    3: 256000,
-    4: 128000,
-    5: 64000,
-    6: 32000,
-    7: 16000,
-    8: 8000,
-    9: 8000,
-    10: 8000,
-    11: 8000,
-}
+
+def update_grid_size_dict(offset=0):
+    base_grid_sizes = [512000, 256000, 128000, 64000, 32000, 16000, 8000]
+    grid_size_dict = {}
+    for zoom in range(1, 11):
+        index = min(max(zoom - 1 + offset, 0), len(base_grid_sizes) - 1)
+        grid_size_dict[zoom] = base_grid_sizes[index]
+    return grid_size_dict
+
+
+# Streamlit widget to adjust grid size offset
+
+st.session_state["grid_size_dict"] = update_grid_size_dict(
+    st.slider("Adjust Grid Size", -9, 6, -9)
+)
 
 win_width = streamlit_js_eval(
     js_expressions="window.innerWidth",
@@ -56,7 +58,7 @@ else:
     map_height = 100
 
 min_zoom = 1
-max_zoom = 11
+max_zoom = 10
 CENTER_START = [0, 0]
 ZOOM_START = 1
 ELEVATION_FRACTION = 12800
@@ -222,7 +224,7 @@ def main():
     feature_group = folium.map.FeatureGroup(name="Points")
 
     if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
-        grid_size = grid_size_dict[st.session_state["zoom"]]
+        grid_size = st.session_state["grid_size_dict"][st.session_state["zoom"]]
         y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
         x_min = max(-180, x_min)
         x_max = min(180, x_max)
