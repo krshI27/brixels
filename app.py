@@ -30,21 +30,18 @@ with open("static/style.css") as css:
         unsafe_allow_html=True,
     )
 
-
-def update_grid_size_dict(offset=0):
-    base_grid_sizes = [512000, 256000, 128000, 64000, 32000, 16000, 8000]
-    grid_size_dict = {}
-    for zoom in range(1, 11):
-        index = min(max(zoom - 1 + offset, 0), len(base_grid_sizes) - 1)
-        grid_size_dict[zoom] = base_grid_sizes[index]
-    return grid_size_dict
-
-
-# Streamlit widget to adjust grid size offset
-
-st.session_state["grid_size_dict"] = update_grid_size_dict(
-    st.slider("Adjust Grid Size", -9, 6, -9)
-)
+st.session_state["grid_size_dict"] = {
+    1: 512000,
+    2: 512000,
+    3: 512000,
+    4: 256000,
+    5: 128000,
+    6: 64000,
+    7: 32000,
+    8: 16000,
+    9: 8000,
+    10: 8000,
+}
 
 win_width = streamlit_js_eval(
     js_expressions="window.innerWidth",
@@ -63,10 +60,10 @@ CENTER_START = [0, 0]
 ZOOM_START = 1
 ELEVATION_FRACTION = 12800
 
-cmap_neg = readcpt("cpt/gmt/nighttime_low.cpt")
-cmap_pos = readcpt("cpt/gmt/nighttime_high.cpt")
-cmap_combined = joincmap(cmap_neg, cmap_pos)
-
+# cmap_neg = readcpt("cpt/gmt/nighttime_low.cpt")
+# cmap_pos = readcpt("cpt/gmt/nighttime_high.cpt")
+# cmap_combined = joincmap(cmap_neg, cmap_pos)
+cmap_combined = readcpt("cpt/gmt/geo.cpt")
 if "bounds" not in st.session_state:
     st.session_state["bounds"] = {
         "_southWest": {"lat": -85.06, "lng": -180},

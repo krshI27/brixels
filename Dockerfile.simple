@@ -1,0 +1,38 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git \
+    libgdal-dev \
+    gcc \
+    g++ \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY environment.yml /app/
+
+# Install miniconda
+RUN apt-get update && apt-get install -y wget && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh && \
+    /opt/conda/bin/conda env create -f environment.yml && \
+    /opt/conda/bin/conda clean -afy && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add conda to path
+ENV PATH=/opt/conda/bin:/opt/conda/envs/brixels/bin:$PATH
+
+# Copy the rest of the application
+COPY . /app/
+
+# Expose Streamlit port
+EXPOSE 8501
+
+# Set entrypoint to run Streamlit
+CMD ["conda", "run", "--no-capture-output", "-n", "brixels", "streamlit", "run", "app.py"]
