@@ -12,9 +12,7 @@ from pyproj import CRS
 from shapely import box
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 from streamlit_folium import st_folium
-from streamlit_js_eval import streamlit_js_eval
 
-os.chdir(os.path.dirname(__file__))
 from cmaptools import joincmap, readcpt
 
 st.set_page_config(
@@ -43,16 +41,9 @@ st.session_state["grid_size_dict"] = {
     10: 8000,
 }
 
-win_width = streamlit_js_eval(
-    js_expressions="window.innerWidth",
-    key="SCR",
-)
-if win_width is not None:
-    map_width = win_width * 3 / 5
-    map_height = win_width * 2 / 5
-else:
-    map_width = 100
-    map_height = 100
+
+map_width = 900
+map_height = 600
 
 min_zoom = 1
 max_zoom = 10
@@ -170,6 +161,7 @@ class BrickIcon:
                 {self._create_circle_base()}
                 {self._create_circle_height()}
                 {self._create_circle_top()}
+                {self._create_circle_top()}
             </g>
         </svg></div>"""
 
@@ -280,18 +272,28 @@ def main():
         use_container_width=True,
     )
 
-    state_changed = False
+    # Only update state and rerun if bounds and zoom are valid
+    if map_meta and "bounds" in map_meta and "zoom" in map_meta:
+        # Check if bounds contains any null values
+        bounds_values = [val for val in traverse(map_meta["bounds"])]
+        if not any(pd.isna(bounds_values)):
+            state_changed = False
 
-    if (
-        st.session_state["bounds"] != map_meta["bounds"]
-        or st.session_state["zoom"] != map_meta["zoom"]
-    ):
-        st.session_state["bounds"] = map_meta["bounds"]
-        st.session_state["zoom"] = map_meta["zoom"]
-        state_changed = True
+            # Check if zoom is within valid range to prevent jumping
+            valid_zoom = min_zoom <= map_meta["zoom"] <= max_zoom
+            
+            if valid_zoom and (
+                st.session_state["bounds"] != map_meta["bounds"] or 
+                st.session_state["zoom"] != map_meta["zoom"]
+            ):
+                # Only update if we're not going to cause a jump
+                if map_meta["zoom"] == st.session_state["zoom"] or abs(map_meta["zoom"] - st.session_state["zoom"]) <= 1:
+                    st.session_state["bounds"] = map_meta["bounds"]
+                    st.session_state["zoom"] = map_meta["zoom"]
+                    state_changed = True
 
-    if state_changed:
-        st.rerun(scope="fragment")
+            if state_changed:
+                st.rerun(scope="fragment")
 
 
 if __name__ == "__main__":

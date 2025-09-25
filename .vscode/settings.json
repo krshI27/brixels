@@ -1,0 +1,52 @@
+{
+    // Project-specific VS Code settings for Python development
+    // GitHub Copilot Settings
+    "github.copilot.enable": {
+        "*": true,
+        "yaml": true,
+        "plaintext": true,
+        "markdown": true,
+        "json": true,
+        "python": true
+    },
+    // Python Settings
+    "python.defaultInterpreterPath": "$HOME/miniforge3/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=88"
+    ],
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    // Editor Settings for Better AI Integration
+    "editor.inlineSuggest.enabled": true,
+    "editor.quickSuggestions": {
+        "comments": "on",
+        "strings": "on",
+        "other": "on"
+    },
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "on",
+    "editor.rulers": [
+        88
+    ],
+    // Formatting and Code Quality
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    // Git Integration
+    "git.autofetch": true,
+    "git.confirmSync": false
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Brixels Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "brixels",
+  "workspaceFolder": "/app",
+  "shutdownAction": "stopCompose",
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "ms-toolsai.jupyter",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-vscode.vscode-json"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/conda/envs/brixels/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.inlineSuggest.enabled": true
+      }
+    }
+  },
+
+  "remoteUser": "root"
+}

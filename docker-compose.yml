@@ -1,0 +1,12 @@
+services:
+  brixels:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./:/app
+      - ../data:/data
+    environment:
+      - PYTHONUNBUFFERED=1
