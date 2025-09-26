@@ -2,7 +2,7 @@ name: brixels
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.12
   - numpy
   - pillow
   - geopandas
@@ -11,6 +11,10 @@ dependencies:
   - streamlit
   - ipykernel
   - pip
+  # Add some dependencies that work better with Apple Silicon
+  - libgdal
+  - proj
+  - geos
   - pip:
     - opencv-python-headless
     - opencv-contrib-python-headless

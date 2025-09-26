@@ -1,4 +1,42 @@
+# Git
 .git/
-*.log
-**/__pycache__/
+.gitignore
+
+# Dev containers
+.devcontainer/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE and editors
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Documentation
+README.md
+docs/
+
+# Docker
+.dockerignore
+docker-compose.yml
