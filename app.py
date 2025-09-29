@@ -80,6 +80,7 @@ def load_grid_data(layer_name, bounds, columns):
         layer=layer_name,
         bbox=tuple(bounds),
         columns=columns,
+        engine="pyogrio",
     )
 
 
@@ -281,13 +282,16 @@ def main():
 
             # Check if zoom is within valid range to prevent jumping
             valid_zoom = min_zoom <= map_meta["zoom"] <= max_zoom
-            
+
             if valid_zoom and (
-                st.session_state["bounds"] != map_meta["bounds"] or 
-                st.session_state["zoom"] != map_meta["zoom"]
+                st.session_state["bounds"] != map_meta["bounds"]
+                or st.session_state["zoom"] != map_meta["zoom"]
             ):
                 # Only update if we're not going to cause a jump
-                if map_meta["zoom"] == st.session_state["zoom"] or abs(map_meta["zoom"] - st.session_state["zoom"]) <= 1:
+                if (
+                    map_meta["zoom"] == st.session_state["zoom"]
+                    or abs(map_meta["zoom"] - st.session_state["zoom"]) <= 1
+                ):
                     st.session_state["bounds"] = map_meta["bounds"]
                     st.session_state["zoom"] = map_meta["zoom"]
                     state_changed = True
