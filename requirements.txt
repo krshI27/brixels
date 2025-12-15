@@ -14,6 +14,9 @@ shapely
 # Cloud storage
 boto3
 
+# Data formats
+pyarrow  # For GeoParquet support
+
 # Visualization
 matplotlib
 
