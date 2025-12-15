@@ -1,0 +1,21 @@
+# Core
+streamlit>=1.28.0
+numpy
+pillow
+
+# Geospatial
+geopandas
+pyogrio
+folium
+streamlit-folium
+pyproj
+shapely
+
+# Cloud storage
+boto3
+
+# Visualization
+matplotlib
+
+# Streamlit extras
+streamlit-extras

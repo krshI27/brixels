@@ -1,1 +1,17 @@
 .DS_Store
+
+# Streamlit secrets - NEVER commit
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Environment
+.env
+.venv/
+venv/

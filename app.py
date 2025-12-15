@@ -8,12 +8,12 @@ import matplotlib.colors as mc
 import numpy as np
 import pandas as pd
 import streamlit as st
+from cmaptools import joincmap, readcpt
 from pyproj import CRS
 from shapely import box
+from src.r2_storage import get_brixels_data_source, load_grid_data_r2
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 from streamlit_folium import st_folium
-
-from cmaptools import joincmap, readcpt
 
 st.set_page_config(
     page_title="Brixels",
@@ -74,14 +74,8 @@ def traverse(d):
 
 @st.cache_data
 def load_grid_data(layer_name, bounds, columns):
-    """Cache grid data loading"""
-    return gpd.read_file(
-        "/data/brixels_world_512000-008000.gpkg",
-        layer=layer_name,
-        bbox=tuple(bounds),
-        columns=columns,
-        engine="pyogrio",
-    )
+    """Cache grid data loading - uses R2 or local file"""
+    return load_grid_data_r2(layer_name, tuple(bounds), columns)
 
 
 @lru_cache(maxsize=256)
