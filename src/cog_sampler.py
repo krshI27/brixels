@@ -7,8 +7,8 @@ providing more flexibility and much smaller storage requirements.
 
 import numpy as np
 import rasterio
-from rasterio.windows import from_bounds
 from pyproj import Transformer
+from rasterio.windows import from_bounds
 
 
 class COGSampler:
