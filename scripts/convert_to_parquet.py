@@ -20,19 +20,19 @@ Output structure:
 """
 
 import json
-import os
 import sqlite3
 from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+from tqdm import tqdm
 
 
 def get_layers(gpkg_path: str) -> list[str]:
-    """Get all layer names from GeoPackage."""
+    """Get all layer names from GeoPackage (excluding non-data layers)."""
     conn = sqlite3.connect(gpkg_path)
     cursor = conn.execute("SELECT table_name FROM gpkg_contents")
-    layers = [row[0] for row in cursor.fetchall()]
+    layers = [row[0] for row in cursor.fetchall() if not row[0].startswith("layer_")]
     conn.close()
     return layers
 
@@ -45,14 +45,33 @@ def get_layer_info(gpkg_path: str, layer: str) -> dict:
     return {"count": count}
 
 
+def write_tile(args: tuple) -> dict:
+    """Write a single tile to parquet. Used for parallel processing."""
+    tile_path, tile_x, tile_y, tile_size, grid_size, gdf_subset = args
+    
+    # Save as GeoParquet with fast compression
+    gdf_subset.to_parquet(tile_path, index=False, compression="snappy")
+    
+    return {
+        "file": f"{grid_size}/{tile_path.name}",
+        "grid_size": grid_size,
+        "min_x": int(tile_x),
+        "min_y": int(tile_y),
+        "max_x": int(tile_x + tile_size),
+        "max_y": int(tile_y + tile_size),
+        "count": len(gdf_subset),
+        "size_bytes": tile_path.stat().st_size,
+    }
+
+
 def partition_layer(
     gpkg_path: str,
     layer: str,
     output_dir: Path,
-    tile_size: float = 10.0,  # degrees
+    tile_size: float = 10.0,
 ) -> list[dict]:
     """
-    Partition a layer into geographic tiles.
+    Partition a layer into geographic tiles using vectorized operations.
 
     Args:
         gpkg_path: Path to GeoPackage
@@ -65,7 +84,7 @@ def partition_layer(
     """
     print(f"  Reading layer {layer}...")
 
-    # Read the full layer (we need all data to partition)
+    # Read with pyogrio for speed
     gdf = gpd.read_file(gpkg_path, layer=layer, engine="pyogrio")
 
     if len(gdf) == 0:
@@ -74,44 +93,51 @@ def partition_layer(
 
     print(f"  {len(gdf):,} features loaded")
 
-    # Ensure we have point geometries
-    gdf["x"] = gdf.geometry.x
-    gdf["y"] = gdf.geometry.y
+    # Calculate tile indices directly from geometry (vectorized)
+    x_coords = gdf.geometry.x.values
+    y_coords = gdf.geometry.y.values
+    
+    tile_x = (np.floor(x_coords / tile_size) * tile_size).astype(np.int16)
+    tile_y = (np.floor(y_coords / tile_size) * tile_size).astype(np.int16)
+    
+    # Add tile columns
+    gdf["_tx"] = tile_x
+    gdf["_ty"] = tile_y
 
-    # Calculate tile indices
-    gdf["tile_x"] = (np.floor(gdf["x"] / tile_size) * tile_size).astype(int)
-    gdf["tile_y"] = (np.floor(gdf["y"] / tile_size) * tile_size).astype(int)
-
-    # Extract grid size from layer name (e.g., "brixels_world_512000" -> "512000")
+    # Extract grid size from layer name
     grid_size = layer.split("_")[-1]
     layer_dir = output_dir / grid_size
     layer_dir.mkdir(parents=True, exist_ok=True)
 
+    # Get unique tile combinations
+    unique_tiles = gdf.groupby(["_tx", "_ty"]).ngroups
+    print(f"  Partitioning into {unique_tiles} tiles...")
+
     tiles = []
-
-    # Group by tile and save
-    for (tile_x, tile_y), tile_gdf in gdf.groupby(["tile_x", "tile_y"]):
-        tile_name = f"tile_{int(tile_x)}_{int(tile_y)}.parquet"
+    
+    # Use groupby with progress bar
+    for (tx, ty), tile_gdf in tqdm(
+        gdf.groupby(["_tx", "_ty"], sort=False),
+        total=unique_tiles,
+        desc="  Writing tiles",
+    ):
+        tile_name = f"tile_{int(tx)}_{int(ty)}.parquet"
         tile_path = layer_dir / tile_name
-
-        # Drop tile columns before saving
-        tile_data = tile_gdf.drop(columns=["tile_x", "tile_y", "x", "y"])
-
-        # Save as GeoParquet
-        tile_data.to_parquet(tile_path, index=False)
-
-        tiles.append(
-            {
-                "file": f"{grid_size}/{tile_name}",
-                "grid_size": grid_size,
-                "min_x": int(tile_x),
-                "min_y": int(tile_y),
-                "max_x": int(tile_x + tile_size),
-                "max_y": int(tile_y + tile_size),
-                "count": len(tile_data),
-                "size_bytes": tile_path.stat().st_size,
-            }
-        )
+        
+        # Drop temp columns and write
+        tile_data = tile_gdf.drop(columns=["_tx", "_ty"])
+        tile_data.to_parquet(tile_path, index=False, compression="snappy")
+        
+        tiles.append({
+            "file": f"{grid_size}/{tile_name}",
+            "grid_size": grid_size,
+            "min_x": int(tx),
+            "min_y": int(ty),
+            "max_x": int(tx + tile_size),
+            "max_y": int(ty + tile_size),
+            "count": len(tile_data),
+            "size_bytes": tile_path.stat().st_size,
+        })
 
     print(f"  Created {len(tiles)} tiles")
     return tiles
@@ -124,6 +150,7 @@ def main():
         "/Users/maximiliansperlich/Developer/projects/data/brixels_parquet"
     )
     tile_size = 10.0  # degrees (adjust for desired tile size)
+    skip_existing = True  # Skip layers that already have tiles
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -136,6 +163,30 @@ def main():
     all_tiles = []
 
     for layer in layers:
+        grid_size = layer.split("_")[-1]
+        layer_dir = output_dir / grid_size
+        
+        # Check if layer already processed
+        if skip_existing and layer_dir.exists():
+            existing_tiles = list(layer_dir.glob("*.parquet"))
+            if existing_tiles:
+                print(f"\nSkipping {layer} ({len(existing_tiles)} tiles already exist)")
+                # Load existing tile metadata
+                for tile_path in existing_tiles:
+                    parts = tile_path.stem.split("_")
+                    tx, ty = int(parts[1]), int(parts[2])
+                    all_tiles.append({
+                        "file": f"{grid_size}/{tile_path.name}",
+                        "grid_size": grid_size,
+                        "min_x": tx,
+                        "min_y": ty,
+                        "max_x": int(tx + tile_size),
+                        "max_y": int(ty + tile_size),
+                        "count": -1,  # Unknown
+                        "size_bytes": tile_path.stat().st_size,
+                    })
+                continue
+        
         info = get_layer_info(gpkg_path, layer)
         print(f"\nProcessing {layer} ({info['count']:,} features)...")
 
