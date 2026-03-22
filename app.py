@@ -1,5 +1,4 @@
 import colorsys
-import os
 from functools import lru_cache
 
 import folium
@@ -11,7 +10,7 @@ import streamlit as st
 from cmaptools import joincmap, readcpt
 from pyproj import CRS
 from shapely import box
-from src.r2_storage import get_brixels_data_source, load_grid_data_r2
+from src.r2_storage import load_grid_data_r2
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 from streamlit_folium import st_folium
 
@@ -27,6 +26,11 @@ with open("static/style.css") as css:
         f"<style>{css.read()}</style>",
         unsafe_allow_html=True,
     )
+
+st.markdown(
+    '<div class="brixels-title">Brixels</div>',
+    unsafe_allow_html=True,
+)
 
 st.session_state["grid_size_dict"] = {
     1: 512000,
@@ -47,14 +51,195 @@ map_height = 600
 
 min_zoom = 1
 max_zoom = 10
-CENTER_START = [0, 0]
-ZOOM_START = 1
+CENTER_START = [20, 15]
+ZOOM_START = 2
 ELEVATION_FRACTION = 12800
 
-# cmap_neg = readcpt("cpt/gmt/nighttime_low.cpt")
-# cmap_pos = readcpt("cpt/gmt/nighttime_high.cpt")
-# cmap_combined = joincmap(cmap_neg, cmap_pos)
-cmap_combined = readcpt("cpt/gmt/geo.cpt")
+# Curated colormaps suited for elevation (symmetric / diverging around sea level)
+COLORMAPS = {
+    "Geo": "cpt/gmt/geo.cpt",
+    "Globe": "cpt/gmt/globe.cpt",
+    "Etopo": "cpt/gmt/etopo1.cpt",
+    "Relief": "cpt/gmt/relief.cpt",
+    "Terra": "cpt/gmt/terra.cpt",
+    "Oleron": "cpt/SCM/oleron.cpt",
+    "Vik": "cpt/SCM/vik.cpt",
+    "Roma": "cpt/SCM/roma.cpt",
+}
+
+BASEMAPS = {
+    "OpenStreetMap": "OpenStreetMap",
+    "CartoDB Positron": "CartoDB positron",
+    "CartoDB Dark": "CartoDB dark_matter",
+    "Stamen Terrain": "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png",
+}
+
+
+def cmap_to_css_gradient(cmap, n_stops=12):
+    """Generate a CSS linear-gradient string from a matplotlib colormap."""
+    norm = mc.TwoSlopeNorm(vmin=-8000, vcenter=0, vmax=8000)
+    values = np.linspace(-8000, 8000, n_stops)
+    colors = [mc.to_hex(cmap(norm(v))[:3]) for v in values]
+    stops = ", ".join(colors)
+    return f"linear-gradient(to right, {stops})"
+
+
+@st.cache_data
+def build_cmap_previews():
+    """Precompute gradient CSS for each colormap."""
+    previews = {}
+    for name, path in COLORMAPS.items():
+        cmap = readcpt(path)
+        previews[name] = cmap_to_css_gradient(cmap)
+    return previews
+
+
+cmap_previews = build_cmap_previews()
+
+def build_brick_info_svg(grid_km, elev_per_plate):
+    """Build an SVG diagram of a 1x1 brick (3 plates) with LEGO-accurate proportions.
+
+    LEGO units: 1p = 1.6mm. Plate = 2p high, Brick = 6p high (3 plates),
+    Stud = 3p wide × 1p tall, 1x1 pitch = 5p wide.
+    """
+    # Scale: 1 LEGO unit (1p = 1.6mm) = 10px
+    p = 10  # px per LEGO unit
+    plate_h = 2 * p    # 20px (3.2mm)
+    brick_h = 6 * p    # 60px (9.6mm = 3 plates)
+    body_w = 5 * p      # 50px (8.0mm pitch)
+    stud_w = 3 * p      # 30px (4.8mm)
+    stud_h = 1 * p      # 10px (1.6mm)
+    # Layout offsets (room for labels)
+    bx, by = 70, 12  # top-left of brick body (below stud)
+    w, h = 260, 120
+
+    col = "#FF9A72"
+    col_dark = "#d0765a"
+    col_line = "#666"
+    fs = 'style="font-family:monospace;font-size:10px;fill:#333"'
+    fs_sm = 'style="font-family:monospace;font-size:9px;fill:#555"'
+
+    elev_per_brick = elev_per_plate * 3
+
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
+
+    # Brick body (single rect for the full height)
+    body_top = by + stud_h
+    svg += f'<rect x="{bx}" y="{body_top}" width="{body_w}" height="{brick_h}" fill="{col}" stroke="{col_dark}" stroke-width="1.5" rx="1"/>'
+
+    # Plate divider lines (dashed)
+    for i in range(1, 3):
+        ly = body_top + i * plate_h
+        svg += f'<line x1="{bx+1}" y1="{ly}" x2="{bx+body_w-1}" y2="{ly}" stroke="{col_dark}" stroke-width="0.8" stroke-dasharray="3,2"/>'
+
+    # Stud on top (centered)
+    stud_x = bx + (body_w - stud_w) / 2
+    svg += f'<rect x="{stud_x}" y="{by}" width="{stud_w}" height="{stud_h}" fill="{col}" stroke="{col_dark}" stroke-width="1.5" rx="1"/>'
+
+    # Right side: plate height labels with tick marks
+    rx = bx + body_w + 5  # right edge + gap
+    for i in range(3):
+        pt = body_top + i * plate_h
+        pb = pt + plate_h
+        mid = (pt + pb) / 2 + 3
+        # Tick marks
+        svg += f'<line x1="{rx}" y1="{pt}" x2="{rx+8}" y2="{pt}" stroke="{col_line}" stroke-width="0.7"/>'
+        svg += f'<line x1="{rx}" y1="{pb}" x2="{rx+8}" y2="{pb}" stroke="{col_line}" stroke-width="0.7"/>'
+        svg += f'<line x1="{rx+4}" y1="{pt}" x2="{rx+4}" y2="{pb}" stroke="{col_line}" stroke-width="0.7"/>'
+        # Label: "1p = Xm"
+        svg += f'<text x="{rx+12}" y="{mid}" {fs_sm}>1p={elev_per_plate:.0f}m</text>'
+
+    # Left side: brick height bracket with label
+    lx = bx - 6
+    bt = body_top
+    bb = body_top + brick_h
+    svg += f'<line x1="{lx}" y1="{bt}" x2="{lx}" y2="{bb}" stroke="{col_line}" stroke-width="0.8"/>'
+    svg += f'<line x1="{lx-4}" y1="{bt}" x2="{lx+3}" y2="{bt}" stroke="{col_line}" stroke-width="0.8"/>'
+    svg += f'<line x1="{lx-4}" y1="{bb}" x2="{lx+3}" y2="{bb}" stroke="{col_line}" stroke-width="0.8"/>'
+    mid_y = (bt + bb) / 2
+    svg += f'<text x="{lx-6}" y="{mid_y-2}" text-anchor="end" {fs}>1b</text>'
+    svg += f'<text x="{lx-6}" y="{mid_y+10}" text-anchor="end" {fs_sm}>{elev_per_brick:.0f}m</text>'
+
+    # Bottom: grid size dimension line
+    bot_y = body_top + brick_h + 10
+    svg += f'<line x1="{bx}" y1="{bot_y}" x2="{bx+body_w}" y2="{bot_y}" stroke="{col_line}" stroke-width="0.8"/>'
+    svg += f'<line x1="{bx}" y1="{bot_y-3}" x2="{bx}" y2="{bot_y+3}" stroke="{col_line}" stroke-width="0.8"/>'
+    svg += f'<line x1="{bx+body_w}" y1="{bot_y-3}" x2="{bx+body_w}" y2="{bot_y+3}" stroke="{col_line}" stroke-width="0.8"/>'
+    svg += f'<text x="{bx+body_w/2}" y="{bot_y+13}" text-anchor="middle" {fs}>{grid_km:.0f} km</text>'
+
+    svg += '</svg>'
+    return svg
+
+
+with st.sidebar:
+    cmap_names = list(COLORMAPS.keys())
+    if "cmap_selection" not in st.session_state:
+        st.session_state["cmap_selection"] = cmap_names[0]
+
+    cmap_name = st.session_state["cmap_selection"]
+    cmap_path = COLORMAPS[cmap_name]
+
+    # Show selected gradient preview, expander for full list
+    sel_grad = cmap_previews[cmap_name]
+    st.markdown("### Colormap")
+    st.markdown(
+        f'<div style="height:18px;border-radius:4px;background:{sel_grad};'
+        f'border:2px solid #FF9A72;margin-bottom:4px;"></div>'
+        f'<div style="font-size:10px;color:#555;text-align:center;">{cmap_name}</div>',
+        unsafe_allow_html=True,
+    )
+    with st.expander("Change colormap"):
+        for name in cmap_names:
+            grad = cmap_previews[name]
+            is_selected = cmap_name == name
+            border = "2px solid #FF9A72" if is_selected else "2px solid transparent"
+            st.markdown(
+                f'<div style="height:14px;border-radius:3px;background:{grad};'
+                f'border:{border};margin-bottom:-12px;"></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button(name, key=f"cmap_{name}", use_container_width=True):
+                st.session_state["cmap_selection"] = name
+                st.rerun()
+
+    st.markdown("### Coloring")
+    color_mode = st.selectbox(
+        "Color by",
+        ["Elevation", "Quantized Height"],
+        key="color_mode",
+        label_visibility="collapsed",
+    )
+
+    st.markdown("### Basemap")
+    basemap_names = list(BASEMAPS.keys())
+    basemap_name = st.selectbox(
+        "Basemap",
+        basemap_names,
+        index=0,
+        label_visibility="collapsed",
+    )
+
+    st.markdown("### Display")
+    show_bricks = st.toggle("Show Bricks", value=True, key="show_bricks")
+    show_water = st.toggle("Show Water", value=True, key="show_water")
+    show_land = st.toggle("Show Land", value=True, key="show_land")
+
+    st.markdown("---")
+    st.markdown("### Map Info")
+    z = st.session_state.get("zoom", ZOOM_START)
+    gs = st.session_state["grid_size_dict"].get(z, 0)
+    elev_max_view = st.session_state.get("elev_max", 8000)
+    elev_per_plate = elev_max_view / 10  # 10 plates = max quantized height
+    brick_svg = build_brick_info_svg(gs / 1000, elev_per_plate)
+    st.markdown(brick_svg, unsafe_allow_html=True)
+    st.markdown(
+        f"**Zoom:** {z} &nbsp;|&nbsp; **Max:** {elev_max_view:.0f}m = "
+        f"{int(elev_max_view / elev_per_plate / 3)}b"
+        f"{int((elev_max_view / elev_per_plate) % 3)}p",
+        unsafe_allow_html=True,
+    )
+
+cmap_combined = readcpt(cmap_path)
 if "bounds" not in st.session_state:
     st.session_state["bounds"] = {
         "_southWest": {"lat": -85.06, "lng": -180},
@@ -70,6 +255,30 @@ def traverse(d):
             yield from traverse(val)
         else:
             yield val
+
+
+def zoom_decimals(zoom):
+    """Rounding precision (decimal places) appropriate for each zoom level."""
+    return zoom // 3
+
+
+def snap_bounds(bounds, zoom):
+    """Snap bounds outward with padding so bricks extend past all viewport edges."""
+    decimals = zoom_decimals(zoom)
+    step = 10**-decimals
+    # Pad by one grid cell so brick bases from beyond the edge fill into view
+    grid_size = st.session_state["grid_size_dict"][zoom]
+    pad = 2 * grid_size / 111320  # ~2 grid cells in degrees (extra for Mercator distortion)
+    return {
+        "_southWest": {
+            "lat": max(-85.06, np.floor((bounds["_southWest"]["lat"] - pad) / step) * step),
+            "lng": max(-180, np.floor((bounds["_southWest"]["lng"] - pad) / step) * step),
+        },
+        "_northEast": {
+            "lat": min(85.06, np.ceil((bounds["_northEast"]["lat"] + pad) / step) * step),
+            "lng": min(180, np.ceil((bounds["_northEast"]["lng"] + pad) / step) * step),
+        },
+    }
 
 
 @st.cache_data
@@ -178,10 +387,11 @@ def calculate_zoom_divisor(grid_size: int) -> float:
     return 15 * (512000 / grid_size)
 
 
-def process_colors(elevations):
+def process_colors(values, norm=None):
     """Vectorized color processing"""
-    norm = mc.TwoSlopeNorm(vmin=-8000, vcenter=0, vmax=8000)
-    colors = np.array([cmap_combined(norm(e)) for e in elevations])
+    if norm is None:
+        norm = mc.TwoSlopeNorm(vmin=-8000, vcenter=0, vmax=8000)
+    colors = np.array([cmap_combined(norm(v)) for v in values])
 
     # Vectorized color calculations
     hex_colors = np.apply_along_axis(lambda x: mc.to_hex(x[:3]), 1, colors)
@@ -193,9 +403,23 @@ def process_colors(elevations):
 
 @st.fragment
 def main():
+    # Restore map position from session state (prevents reset on fragment rerun)
+    bounds_state = st.session_state["bounds"]
+    sw = bounds_state["_southWest"]
+    ne = bounds_state["_northEast"]
+    center = [(sw["lat"] + ne["lat"]) / 2, (sw["lng"] + ne["lng"]) / 2]
+    current_zoom = st.session_state["zoom"]
+
+    basemap_tile = BASEMAPS[basemap_name]
+    # Stamen Terrain uses a custom URL template
+    if basemap_tile.startswith("http"):
+        tiles_arg = None
+    else:
+        tiles_arg = basemap_tile
+
     m = folium.Map(
-        location=CENTER_START,
-        zoom_start=ZOOM_START,
+        location=center,
+        zoom_start=current_zoom,
         min_lat=-85.06,
         max_lat=85.06,
         min_lon=-180,
@@ -203,12 +427,19 @@ def main():
         max_bounds=True,
         min_zoom=min_zoom,
         max_zoom=max_zoom,
+        tiles=tiles_arg,
     )
+    if basemap_tile.startswith("http"):
+        folium.TileLayer(
+            tiles=basemap_tile,
+            attr="Stadia/Stamen",
+            name="Stamen Terrain",
+        ).add_to(m)
 
     feature_group = folium.map.FeatureGroup(name="Points")
 
-    if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
-        grid_size = st.session_state["grid_size_dict"][st.session_state["zoom"]]
+    if show_bricks and not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
+        grid_size = st.session_state["grid_size_dict"][current_zoom]
         y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
         x_min = max(-180, x_min)
         x_max = min(180, x_max)
@@ -221,77 +452,108 @@ def main():
         layer_name = f"brixels_world_{grid_size:06d}"
         grid = load_grid_data(layer_name, bounds, ["elevation", "geometry"])
 
-        # Optimize coordinate extraction
-        grid["x"] = grid.geometry.x
-        grid["y"] = grid.geometry.y
+        # Water/land filtering
+        if not show_water:
+            grid = grid[grid["elevation"] > 0]
+        if not show_land:
+            grid = grid[grid["elevation"] <= 0]
 
-        zoom_divisor = calculate_zoom_divisor(grid_size)
-        zoom = (2 ** st.session_state["zoom"]) / zoom_divisor
+        if len(grid) > 0:
+            grid["x"] = grid.geometry.x
+            grid["y"] = grid.geometry.y
 
-        # Optimize sorting
-        grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
-        grid = grid.to_crs(epsg=4326)
+            zoom_divisor = calculate_zoom_divisor(grid_size)
+            zoom = (2 ** current_zoom) / zoom_divisor
 
-        # Optimize point extraction
-        grid_list = np.column_stack((grid.geometry.y, grid.geometry.x)).tolist()
+            grid.sort_values(["y", "x"], ascending=[False, True], inplace=True)
+            grid = grid.to_crs(epsg=4326)
 
-        elevation = grid["elevation"].values
+            grid_list = np.column_stack((grid.geometry.y, grid.geometry.x)).tolist()
 
-        # Vectorized color processing
-        colors, shadow_colors = process_colors(elevation)
+            raw_elevation = grid["elevation"].values
+            elev_max = np.max(np.abs(raw_elevation))
+            st.session_state["elev_max"] = float(elev_max)
 
-        elev_min, elev_max = 0, np.max(elevation)
-        elevation = np.maximum(
-            10 * np.round(10 * ((elevation - elev_min) / elev_max)), 10
-        )
+            # Color based on selected mode
+            if color_mode == "Quantized Height":
+                if elev_max > 0:
+                    quant = np.maximum(10 * np.round(10 * (raw_elevation / elev_max)), 10)
+                else:
+                    quant = np.full_like(raw_elevation, 10)
+                colors, shadow_colors = process_colors(
+                    quant, mc.Normalize(vmin=10, vmax=100)
+                )
+            else:
+                colors, shadow_colors = process_colors(raw_elevation)
 
-        # Batch process markers
-        feature_group = folium.map.FeatureGroup(name="Points")
-        for point, elev, col, col_shd in zip(
-            grid_list, elevation, colors, shadow_colors
-        ):
-            svg = generate_brick_svg(zoom, elev, col, col_shd)
-            icon_anchor = (elev * zoom, elev * zoom)
-            marker = folium.Marker(
-                point,
-                icon=folium.DivIcon(
-                    icon_anchor=icon_anchor,
-                    html=svg,
-                ),
-            )
-            feature_group.add_child(marker)
+            if elev_max > 0:
+                elevation = np.maximum(
+                    10 * np.round(10 * (raw_elevation / elev_max)), 10
+                )
+            else:
+                elevation = np.full_like(raw_elevation, 10)
+
+            feature_group = folium.map.FeatureGroup(name="Points")
+            for point, elev, raw_elev, col, col_shd in zip(
+                grid_list, elevation, raw_elevation, colors, shadow_colors
+            ):
+                svg = generate_brick_svg(zoom, elev, col, col_shd)
+                icon_anchor = (elev * zoom, elev * zoom)
+                # Compact brick/plate notation (e.g., "3200m | 3b2p")
+                n_plates = int(elev / 10)
+                n_bricks = n_plates // 3
+                remainder = n_plates % 3
+                parts = ""
+                if n_bricks > 0:
+                    parts += f"{n_bricks}b"
+                if remainder > 0 or n_bricks == 0:
+                    parts += f"{remainder}p"
+                tip = f"{int(raw_elev)}m | {parts}"
+                marker = folium.Marker(
+                    point,
+                    icon=folium.DivIcon(
+                        icon_anchor=icon_anchor,
+                        html=svg,
+                    ),
+                    tooltip=tip,
+                )
+                feature_group.add_child(marker)
 
     map_meta = st_folium(
         m,
         feature_group_to_add=feature_group,
         use_container_width=True,
+        height=800,
     )
 
-    # Only update state and rerun if bounds and zoom are valid
+    # Update state when bounds or zoom change
     if map_meta and "bounds" in map_meta and "zoom" in map_meta:
-        # Check if bounds contains any null values
         bounds_values = [val for val in traverse(map_meta["bounds"])]
         if not any(pd.isna(bounds_values)):
-            state_changed = False
+            new_zoom = int(round(map_meta["zoom"]))
+            new_bounds = snap_bounds(map_meta["bounds"], new_zoom)
 
-            # Check if zoom is within valid range to prevent jumping
-            valid_zoom = min_zoom <= map_meta["zoom"] <= max_zoom
+            state_changed = (
+                new_bounds != st.session_state["bounds"]
+                or new_zoom != st.session_state["zoom"]
+            )
 
-            if valid_zoom and (
-                st.session_state["bounds"] != map_meta["bounds"]
-                or st.session_state["zoom"] != map_meta["zoom"]
-            ):
-                # Only update if we're not going to cause a jump
-                if (
-                    map_meta["zoom"] == st.session_state["zoom"]
-                    or abs(map_meta["zoom"] - st.session_state["zoom"]) <= 1
-                ):
-                    st.session_state["bounds"] = map_meta["bounds"]
-                    st.session_state["zoom"] = map_meta["zoom"]
-                    state_changed = True
-
-            if state_changed:
-                st.rerun(scope="fragment")
+            if state_changed and min_zoom <= new_zoom <= max_zoom:
+                if st.session_state.get("_rerun_pending"):
+                    # First return after a rerun — absorb render jitter, don't loop
+                    st.session_state["_rerun_pending"] = False
+                else:
+                    zoom_changed = new_zoom != st.session_state["zoom"]
+                    st.session_state["bounds"] = new_bounds
+                    st.session_state["zoom"] = new_zoom
+                    st.session_state["_rerun_pending"] = True
+                    if zoom_changed:
+                        # Full rerun so sidebar (Map Info) updates
+                        st.rerun()
+                    else:
+                        st.rerun(scope="fragment")
+            else:
+                st.session_state["_rerun_pending"] = False
 
 
 if __name__ == "__main__":

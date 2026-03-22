@@ -354,7 +354,11 @@ def readcpt(cptfile, name=None, hinge=0, override_hinge=False, N=256):
 
             # if not None look for hinge
             if not override_hinge and "HINGE" in line:
-                hinge = float(line.split("=")[-1])
+                if "=" in line:
+                    hinge = float(line.split("=")[-1])
+                # SOFT_HINGE / HARD_HINGE without value default to 0
+                elif hinge is None:
+                    hinge = 0.0
                 continue
 
             # skip other comments

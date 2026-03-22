@@ -15,3 +15,109 @@ font-size: 64px;
 text-align: center;
 color: #ff9a72;
 }
+
+/* Light grey background */
+.stApp {
+    background-color: #e8e8e8 !important;
+}
+
+/* Remove Streamlit default padding and make map fill viewport */
+.stMainBlockContainer {
+    padding: 20px 20px 40px 20px !important;
+    max-width: 100% !important;
+}
+
+.stMain {
+    overflow: hidden !important;
+}
+
+header[data-testid="stHeader"] {
+    background-color: #e8e8e8 !important;
+}
+
+footer {
+    display: none !important;
+}
+
+/* Loading spinner behind the map iframe */
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Make folium map fill the viewport minus header + padding */
+[data-testid="stVerticalBlock"] > div:has(iframe) {
+    position: relative;
+    height: calc(100vh - 60px) !important;
+}
+
+[data-testid="stVerticalBlock"] > div:has(iframe)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #d0d0d0;
+    border-top-color: #FF9A72;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    pointer-events: none;
+}
+
+[data-testid="stVerticalBlock"] > div:has(iframe) > div {
+    position: relative;
+    z-index: 1;
+    height: calc(100vh - 60px) !important;
+}
+
+iframe {
+    height: calc(100vh - 60px) !important;
+}
+
+/* Floating title branding */
+.brixels-title {
+    position: fixed;
+    bottom: 28px;
+    left: 28px;
+    z-index: 1000;
+    font-family: 'karoshirtregular';
+    font-size: 28px;
+    color: #FF9A72;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    letter-spacing: 4px;
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+    background-color: #d0d0d0 !important;
+}
+
+[data-testid="stSidebar"] h3 {
+    font-family: 'karoshirtregular' !important;
+    color: #FF9A72 !important;
+    font-size: 24px !important;
+}
+
+/* Compact toggles in sidebar */
+[data-testid="stSidebar"] [data-testid="stToggle"] {
+    margin-bottom: -8px;
+}
+
+/* Compact colormap buttons */
+[data-testid="stSidebar"] [data-testid="stButton"] button {
+    padding: 2px 8px !important;
+    min-height: 0 !important;
+    height: 22px !important;
+    font-size: 10px !important;
+    color: #555 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stSidebar"] [data-testid="stButton"] {
+    margin-top: -8px;
+    margin-bottom: 2px;
+}
