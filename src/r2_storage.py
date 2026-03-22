@@ -2,7 +2,7 @@
 Cloudflare R2 storage integration for Brixels.
 
 Provides tile-based data loading from R2 with local file fallback for development.
-Uses GeoParquet tiles partitioned by geographic region for efficient loading.
+Uses GeoParquet tiles partitioned by geographic region in EPSG:3857.
 """
 
 import json
@@ -42,26 +42,21 @@ def get_r2_client():
 
 
 # ============================================================================
-# Local Development Detection
+# Local Development Fallback
 # ============================================================================
 
-
-def is_local_dev() -> bool:
-    """Check if running in local development mode with local data."""
-    local_gpkg = Path("/data/brixels_world_512000-008000.gpkg")
-    local_parquet = Path(
-        "/Users/maximiliansperlich/Developer/projects/data/brixels_parquet/index.json"
+LOCAL_PARQUET_DIR = Path(
+    os.environ.get(
+        "BRIXELS_PARQUET_DIR",
+        "/tmp/brixels_parquet_v2",
     )
-    return local_gpkg.exists() or local_parquet.exists()
+)
 
 
 def get_local_parquet_dir() -> Path | None:
     """Get local parquet directory if available."""
-    local_dir = Path(
-        "/Users/maximiliansperlich/Developer/projects/data/brixels_parquet"
-    )
-    if local_dir.exists():
-        return local_dir
+    if LOCAL_PARQUET_DIR.exists() and (LOCAL_PARQUET_DIR / "index.json").exists():
+        return LOCAL_PARQUET_DIR
     return None
 
 
@@ -93,6 +88,8 @@ def get_tiles_for_bounds(bounds: tuple, grid_size: str) -> list[dict]:
     """
     Get list of tiles that intersect with the given bounds.
 
+    Both bounds and tile boundaries are in EPSG:3857 (meters).
+
     Args:
         bounds: (minx, miny, maxx, maxy) in EPSG:3857
         grid_size: Grid size string (e.g., "512000")
@@ -101,29 +98,19 @@ def get_tiles_for_bounds(bounds: tuple, grid_size: str) -> list[dict]:
         List of tile metadata dicts
     """
     index = load_tile_index()
-    tile_size = index["tile_size_degrees"]
-
     minx, miny, maxx, maxy = bounds
 
-    # Convert bounds from EPSG:3857 to EPSG:4326 (approximate)
-    # For more accuracy, use pyproj transform
-    lon_min = max(-180, minx / 111320)
-    lon_max = min(180, maxx / 111320)
-    lat_min = max(-90, miny / 110540)
-    lat_max = min(90, maxy / 110540)
-
-    # Find intersecting tiles
     matching_tiles = []
     for tile in index["tiles"]:
         if tile["grid_size"] != grid_size:
             continue
 
-        # Check intersection
+        # Direct EPSG:3857 bbox intersection test
         if (
-            tile["max_x"] > lon_min
-            and tile["min_x"] < lon_max
-            and tile["max_y"] > lat_min
-            and tile["min_y"] < lat_max
+            tile["max_x"] > minx
+            and tile["min_x"] < maxx
+            and tile["max_y"] > miny
+            and tile["min_y"] < maxy
         ):
             matching_tiles.append(tile)
 
@@ -135,13 +122,13 @@ def get_tiles_for_bounds(bounds: tuple, grid_size: str) -> list[dict]:
 # ============================================================================
 
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+@st.cache_data(ttl=3600)
 def load_tile(tile_file: str) -> gpd.GeoDataFrame:
     """
     Load a single tile from local storage or R2.
 
     Args:
-        tile_file: Relative path to tile file (e.g., "512000/tile_-180_-90.parquet")
+        tile_file: Relative path to tile file (e.g., "512000/all.parquet")
 
     Returns:
         GeoDataFrame with tile data
@@ -176,26 +163,13 @@ def load_grid_data_r2(
     Returns:
         GeoDataFrame with requested data
     """
-    # Extract grid size from layer name
     grid_size = layer_name.split("_")[-1]
-
-    # Check if we should use legacy GeoPackage (for backwards compatibility)
-    local_gpkg = Path("/data/brixels_world_512000-008000.gpkg")
-    if local_gpkg.exists() and not get_local_parquet_dir():
-        return gpd.read_file(
-            str(local_gpkg),
-            layer=layer_name,
-            bbox=bounds,
-            columns=columns,
-            engine="pyogrio",
-        )
 
     # Get tiles that intersect the bounds
     tiles = get_tiles_for_bounds(bounds, grid_size)
 
     if not tiles:
-        # Return empty GeoDataFrame with expected columns
-        return gpd.GeoDataFrame(columns=columns + ["geometry"])
+        return gpd.GeoDataFrame(columns=list(dict.fromkeys(columns + ["geometry"])))
 
     # Load and concatenate tiles
     gdfs = []
@@ -207,9 +181,8 @@ def load_grid_data_r2(
             st.warning(f"Failed to load tile {tile['file']}: {e}")
 
     if not gdfs:
-        return gpd.GeoDataFrame(columns=columns + ["geometry"])
+        return gpd.GeoDataFrame(columns=list(dict.fromkeys(columns + ["geometry"])))
 
-    # Concatenate all tiles
     combined = pd.concat(gdfs, ignore_index=True)
     result = gpd.GeoDataFrame(combined, geometry="geometry")
 
@@ -223,29 +196,20 @@ def load_grid_data_r2(
     )
     result = result[mask]
 
-    # Select only requested columns
-    available_cols = [c for c in columns if c in result.columns]
+    # Select only requested columns (avoid duplicating geometry)
+    available_cols = [c for c in columns if c in result.columns and c != "geometry"]
     return result[available_cols + ["geometry"]]
 
 
 # ============================================================================
-# Legacy Support (deprecated, will be removed)
+# Legacy Support (deprecated)
 # ============================================================================
 
 
 @st.cache_resource
 def get_brixels_data_source():
-    """
-    DEPRECATED: Get the data source path for legacy GeoPackage loading.
-    Use load_grid_data_r2() with tile-based loading instead.
-    """
-    local_path = "/data/brixels_world_512000-008000.gpkg"
-
-    if os.path.exists(local_path):
-        return local_path
-
-    # This path should not be used in production - tiles are preferred
+    """DEPRECATED: Use load_grid_data_r2() with tile-based loading instead."""
     raise RuntimeError(
         "Legacy GeoPackage loading is deprecated. "
-        "Please convert to GeoParquet tiles using scripts/convert_to_parquet.py"
+        "Use load_grid_data_r2() with GeoParquet tiles."
     )

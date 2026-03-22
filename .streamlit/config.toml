@@ -1,9 +1,9 @@
 [theme]
-base="dark"
+base="light"
 primaryColor="#FF9A72"
-backgroundColor="#277AA2"
-secondaryBackgroundColor="#08567C"
-textColor="#FFF1D0"
+backgroundColor="#e8e8e8"
+secondaryBackgroundColor="#d0d0d0"
+textColor="#333333"
 font = "monospace"
 
 [client]
