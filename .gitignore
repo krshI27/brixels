@@ -1,5 +1,3 @@
-.DS_Store
-
 # Streamlit secrets - NEVER commit
 .streamlit/secrets.toml
 
@@ -10,9 +8,25 @@ __pycache__/
 .eggs/
 dist/
 build/
+.mypy_cache/
 
 # Environment
 .env
 .venv/
 venv/
+
+# OS
 .DS_Store
+
+# IDE / editor
+.vscode/
+.idea/
+
+# AI assistants
+.claude/
+.config/ai-instructions.md
+.github/copilot-instructions.md
+.github/prompts/
+
+# Dev containers
+.devcontainer/
