@@ -9,21 +9,31 @@
 
 }
 
-h1, [class*="css"]  {
-font-family: 'karoshirtregular';
-font-size: 64px;
-text-align: center;
-color: #ff9a72;
+/* Smooth scrolling */
+* {
+    scroll-behavior: smooth;
 }
 
-/* Light grey background */
+/* Title styling - now in sidebar */
+[data-testid="stSidebar"] h1 {
+    font-family: 'karoshirtregular' !important;
+    font-size: 48px !important;
+    text-align: center !important;
+    color: #86817e !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 0 12px 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+}
+
+/* Clean white-grey background */
 .stApp {
-    background-color: #e8e8e8 !important;
+    background-color: #FAFAFA !important;
 }
 
 /* Remove Streamlit default padding and make map fill viewport */
 .stMainBlockContainer {
-    padding: 20px 20px 40px 20px !important;
+    padding: 10px !important;
     max-width: 100% !important;
 }
 
@@ -32,7 +42,20 @@ color: #ff9a72;
 }
 
 header[data-testid="stHeader"] {
-    background-color: #e8e8e8 !important;
+    background-color: #FAFAFA !important;
+}
+
+/* Make header menu buttons visible with proper contrast */
+header[data-testid="stHeader"] button,
+header[data-testid="stHeader"] [data-testid="stHeaderActionElements"] button {
+    color: #2C2C2C !important;
+    background-color: rgba(255, 154, 114, 0.1) !important;
+    border: 1px solid rgba(255, 154, 114, 0.3) !important;
+    border-radius: 4px !important;
+}
+
+header[data-testid="stHeader"] button:hover {
+    background-color: rgba(255, 154, 114, 0.2) !important;
 }
 
 footer {
@@ -44,10 +67,10 @@ footer {
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-/* Make folium map fill the viewport minus header + padding */
+/* Make folium map fill the viewport minus minimal padding */
 [data-testid="stVerticalBlock"] > div:has(iframe) {
     position: relative;
-    height: calc(100vh - 60px) !important;
+    height: calc(100vh - 90px) !important;
 }
 
 [data-testid="stVerticalBlock"] > div:has(iframe)::after {
@@ -57,7 +80,7 @@ footer {
     left: 50%;
     width: 40px;
     height: 40px;
-    border: 4px solid #d0d0d0;
+    border: 4px solid #E0E0E0;
     border-top-color: #FF9A72;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -69,42 +92,218 @@ footer {
 [data-testid="stVerticalBlock"] > div:has(iframe) > div {
     position: relative;
     z-index: 1;
-    height: calc(100vh - 60px) !important;
+    height: calc(100vh - 90px) !important;
 }
 
 iframe {
-    height: calc(100vh - 60px) !important;
+    height: calc(100vh - 90px) !important;
+    animation: fadeIn 0.6s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 
 /* Sidebar styling */
 [data-testid="stSidebar"] {
-    background-color: #d0d0d0 !important;
+    background-color: #F5F5F5 !important;
+    padding-top: 16px !important;
+}
+
+/* First divider after title */
+[data-testid="stSidebar"] hr:first-of-type {
+    margin: 8px 0 16px 0 !important;
+    border-color: rgba(255, 154, 114, 0.5) !important;
+    border-width: 2px !important;
 }
 
 [data-testid="stSidebar"] h3 {
-    font-family: 'karoshirtregular' !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     color: #FF9A72 !important;
-    font-size: 24px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin-top: 24px !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 2px solid rgba(255, 154, 114, 0.3) !important;
+    letter-spacing: 0.5px !important;
 }
 
 /* Compact toggles in sidebar */
 [data-testid="stSidebar"] [data-testid="stToggle"] {
-    margin-bottom: -8px;
+    margin-bottom: 8px;
 }
 
-/* Compact colormap buttons */
-[data-testid="stSidebar"] [data-testid="stButton"] button {
-    padding: 2px 8px !important;
+/* Enhanced toggle styling */
+[data-testid="stSidebar"] [data-testid="stToggle"] label {
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    color: #2C2C2C !important;
+}
+
+/* Compact colormap buttons – hide text labels, keep only gradient bars */
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stButton"] button {
+    padding: 0 !important;
     min-height: 0 !important;
-    height: 22px !important;
-    font-size: 10px !important;
-    color: #555 !important;
+    height: 4px !important;
+    font-size: 0 !important;
+    color: transparent !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    cursor: pointer !important;
+    transition: transform 0.2s ease, opacity 0.2s ease !important;
 }
-[data-testid="stSidebar"] [data-testid="stButton"] {
-    margin-top: -8px;
-    margin-bottom: 2px;
+
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stButton"] button:hover {
+    transform: scaleY(1.5) !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stButton"] {
+    margin-top: -10px;
+    margin-bottom: -4px;
+}
+
+/* Colormap gradient divs hover effect */
+[data-testid="stSidebar"] [data-testid="stExpander"] div[title] {
+    transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stExpander"] div[title]:hover {
+    opacity: 1 !important;
+    transform: scaleY(1.2) !important;
+}
+
+/* Expander styling */
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+    background-color: rgba(255, 255, 255, 0.4) !important;
+    border-radius: 8px !important;
+    padding: 4px !important;
+    margin-bottom: 8px !important;
+}
+
+/* Selectbox styling - clean white background */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] {
+    background-color: white !important;
+    border-radius: 6px !important;
+    padding: 4px !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stSelectbox"] select,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] {
+    background-color: white !important;
+    border: 1px solid #E0E0E0 !important;
+    color: #2C2C2C !important;
+}
+
+/* Section spacing */
+[data-testid="stSidebar"] > div > div {
+    margin-bottom: 16px !important;
+}
+
+/* Improve horizontal rule styling */
+[data-testid="stSidebar"] hr {
+    margin: 24px 0 !important;
+    border-color: rgba(255, 154, 114, 0.4) !important;
+    border-width: 1px !important;
+}
+
+/* Reset View button styling - secondary style with white background */
+[data-testid="stSidebar"] button[kind="secondary"]:has-text("🔄 Reset View"),
+[data-testid="stSidebar"] button:has-text("Reset View") {
+    background-color: white !important;
+    border: 2px solid #FF9A72 !important;
+    color: #FF9A72 !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+}
+
+[data-testid="stSidebar"] button[kind="secondary"]:has-text("🔄 Reset View"):hover,
+[data-testid="stSidebar"] button:has-text("Reset View"):hover {
+    background-color: rgba(255, 154, 114, 0.1) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 48px !important;
+    }
+
+    [data-testid="stSidebar"] h3 {
+        font-size: 22px !important;
+    }
+
+    .stMainBlockContainer {
+        padding: 10px !important;
+    }
+
+    [data-testid="stVerticalBlock"] > div:has(iframe),
+    [data-testid="stVerticalBlock"] > div:has(iframe) > div,
+    iframe {
+        height: calc(100vh - 40px) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 36px !important;
+    }
+}
+
+/* Focus states for accessibility */
+button:focus-visible,
+[data-testid="stButton"] button:focus-visible {
+    outline: 2px solid #FF9A72 !important;
+    outline-offset: 2px !important;
+}
+
+/* Better toggle switch styling - orange when active */
+[data-testid="stToggle"] > label > div {
+    transition: background-color 0.2s ease !important;
+}
+
+[data-testid="stToggle"] input:checked + div {
+    background-color: #FF9A72 !important;
+}
+
+/* Improve expander header */
+[data-testid="stExpander"] summary {
+    transition: background-color 0.2s ease !important;
+}
+
+[data-testid="stExpander"] summary:hover {
+    background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Loading state improvements */
+[data-testid="stSpinner"] {
+    color: #FF9A72 !important;
+}
+
+/* Hide basemap tiles when "None" is selected - show white background */
+.leaflet-tile-pane {
+    transition: opacity 0.3s ease !important;
+}
+
+/* Export button styling */
+[data-testid="stSidebar"] button:has-text("Export"),
+[data-testid="stSidebar"] button:has-text("📥 Export Map") {
+    background: linear-gradient(135deg, #FF9A72 0%, #FF7A52 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(255, 154, 114, 0.3) !important;
+}
+
+[data-testid="stSidebar"] button:has-text("Export"):hover,
+[data-testid="stSidebar"] button:has-text("📥 Export Map"):hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(255, 154, 114, 0.4) !important;
 }
