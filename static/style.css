@@ -76,19 +76,6 @@ iframe {
     height: calc(100vh - 60px) !important;
 }
 
-/* Floating title branding */
-.brixels-title {
-    position: fixed;
-    bottom: 28px;
-    left: 28px;
-    z-index: 1000;
-    font-family: 'karoshirtregular';
-    font-size: 28px;
-    color: #FF9A72;
-    pointer-events: none;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    letter-spacing: 4px;
-}
 
 /* Sidebar styling */
 [data-testid="stSidebar"] {

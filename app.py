@@ -27,10 +27,6 @@ with open("static/style.css") as css:
         unsafe_allow_html=True,
     )
 
-st.markdown(
-    '<div class="brixels-title">Brixels</div>',
-    unsafe_allow_html=True,
-)
 
 st.session_state["grid_size_dict"] = {
     1: 512000,
@@ -68,10 +64,8 @@ COLORMAPS = {
 }
 
 BASEMAPS = {
-    "OpenStreetMap": "OpenStreetMap",
-    "CartoDB Positron": "CartoDB positron",
-    "CartoDB Dark": "CartoDB dark_matter",
-    "Stamen Terrain": "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png",
+    "Color": "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png",
+    "Greyscale": "CartoDB positron",
 }
 
 
@@ -172,6 +166,8 @@ def build_brick_info_svg(grid_km, elev_per_plate):
 
 
 with st.sidebar:
+    st.markdown("### Brixels")
+
     cmap_names = list(COLORMAPS.keys())
     if "cmap_selection" not in st.session_state:
         st.session_state["cmap_selection"] = cmap_names[0]
@@ -184,8 +180,7 @@ with st.sidebar:
     st.markdown("### Colormap")
     st.markdown(
         f'<div style="height:18px;border-radius:4px;background:{sel_grad};'
-        f'border:2px solid #FF9A72;margin-bottom:4px;"></div>'
-        f'<div style="font-size:10px;color:#555;text-align:center;">{cmap_name}</div>',
+        f'border:2px solid #FF9A72;margin-bottom:4px;"></div>',
         unsafe_allow_html=True,
     )
     with st.expander("Change colormap"):
@@ -195,20 +190,12 @@ with st.sidebar:
             border = "2px solid #FF9A72" if is_selected else "2px solid transparent"
             st.markdown(
                 f'<div style="height:14px;border-radius:3px;background:{grad};'
-                f'border:{border};margin-bottom:-12px;"></div>',
+                f'border:{border};margin-bottom:2px;"></div>',
                 unsafe_allow_html=True,
             )
             if st.button(name, key=f"cmap_{name}", use_container_width=True):
                 st.session_state["cmap_selection"] = name
                 st.rerun()
-
-    st.markdown("### Coloring")
-    color_mode = st.selectbox(
-        "Color by",
-        ["Elevation", "Quantized Height"],
-        key="color_mode",
-        label_visibility="collapsed",
-    )
 
     st.markdown("### Basemap")
     basemap_names = list(BASEMAPS.keys())
@@ -220,7 +207,6 @@ with st.sidebar:
     )
 
     st.markdown("### Display")
-    show_bricks = st.toggle("Show Bricks", value=True, key="show_bricks")
     show_water = st.toggle("Show Water", value=True, key="show_water")
     show_land = st.toggle("Show Land", value=True, key="show_land")
 
@@ -232,12 +218,6 @@ with st.sidebar:
     elev_per_plate = elev_max_view / 10  # 10 plates = max quantized height
     brick_svg = build_brick_info_svg(gs / 1000, elev_per_plate)
     st.markdown(brick_svg, unsafe_allow_html=True)
-    st.markdown(
-        f"**Zoom:** {z} &nbsp;|&nbsp; **Max:** {elev_max_view:.0f}m = "
-        f"{int(elev_max_view / elev_per_plate / 3)}b"
-        f"{int((elev_max_view / elev_per_plate) % 3)}p",
-        unsafe_allow_html=True,
-    )
 
 cmap_combined = readcpt(cmap_path)
 if "bounds" not in st.session_state:
@@ -438,7 +418,7 @@ def main():
 
     feature_group = folium.map.FeatureGroup(name="Points")
 
-    if show_bricks and not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
+    if not any(pd.isna([val for val in traverse(st.session_state["bounds"])])):
         grid_size = st.session_state["grid_size_dict"][current_zoom]
         y_min, x_min, y_max, x_max = traverse(st.session_state["bounds"])
         x_min = max(-180, x_min)
@@ -474,17 +454,7 @@ def main():
             elev_max = np.max(np.abs(raw_elevation))
             st.session_state["elev_max"] = float(elev_max)
 
-            # Color based on selected mode
-            if color_mode == "Quantized Height":
-                if elev_max > 0:
-                    quant = np.maximum(10 * np.round(10 * (raw_elevation / elev_max)), 10)
-                else:
-                    quant = np.full_like(raw_elevation, 10)
-                colors, shadow_colors = process_colors(
-                    quant, mc.Normalize(vmin=10, vmax=100)
-                )
-            else:
-                colors, shadow_colors = process_colors(raw_elevation)
+            colors, shadow_colors = process_colors(raw_elevation)
 
             if elev_max > 0:
                 elevation = np.maximum(
