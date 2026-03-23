@@ -1,3 +1,19 @@
+"""
+Brixel Photo idea -- photo-to-brick visualization.
+
+Take an input photo, compute a depth map (e.g. MiDaS / Depth Anything),
+then build a brick grid where:
+  - brick height = depth value (quantized to plates, same as elevation brixels)
+  - brick color  = average pixel color within each grid cell's footprint
+
+This would reuse the BrickIcon SVG renderer and colormap pipeline from app.py
+but replace the R2 elevation data source with per-image depth + color sampling.
+
+Status: idea / prototype -- the helper below creates a georeferenced raster
+from an image array, which could serve as the bridge to the existing grid
+pipeline.
+"""
+
 from pathlib import Path
 
 import numpy as np
