@@ -66,6 +66,7 @@ COLORMAPS = {
 BASEMAPS = {
     "Color": "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png",
     "Greyscale": "CartoDB positron",
+    "None": None,
 }
 
 
@@ -166,11 +167,22 @@ def build_brick_info_svg(grid_km, elev_per_plate):
 
 
 with st.sidebar:
-    st.markdown("### Brixels")
-
+    # Title at the top of sidebar
+    st.markdown(
+        '<h1 style="margin:0;padding:0;line-height:1;">Brixels</h1>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
     cmap_names = list(COLORMAPS.keys())
+    # Initialize user preferences in session state
     if "cmap_selection" not in st.session_state:
         st.session_state["cmap_selection"] = cmap_names[0]
+    if "basemap_selection" not in st.session_state:
+        st.session_state["basemap_selection"] = "Color"
+    if "show_water" not in st.session_state:
+        st.session_state["show_water"] = True
+    if "show_land" not in st.session_state:
+        st.session_state["show_land"] = True
 
     cmap_name = st.session_state["cmap_selection"]
     cmap_path = COLORMAPS[cmap_name]
@@ -188,9 +200,10 @@ with st.sidebar:
             grad = cmap_previews[name]
             is_selected = cmap_name == name
             border = "2px solid #FF9A72" if is_selected else "2px solid transparent"
+            opacity = "1" if is_selected else "0.7"
             st.markdown(
-                f'<div style="height:14px;border-radius:3px;background:{grad};'
-                f'border:{border};margin-bottom:2px;"></div>',
+                f'<div title="{name}" style="height:14px;border-radius:3px;background:{grad};'
+                f'border:{border};margin-bottom:4px;opacity:{opacity};cursor:pointer;"></div>',
                 unsafe_allow_html=True,
             )
             if st.button(name, key=f"cmap_{name}", use_container_width=True):
@@ -199,16 +212,31 @@ with st.sidebar:
 
     st.markdown("### Basemap")
     basemap_names = list(BASEMAPS.keys())
+    basemap_index = basemap_names.index(st.session_state["basemap_selection"])
     basemap_name = st.selectbox(
         "Basemap",
         basemap_names,
-        index=0,
+        index=basemap_index,
         label_visibility="collapsed",
+        key="basemap_selector",
+        on_change=lambda: st.session_state.update({"basemap_selection": st.session_state["basemap_selector"]}),
     )
 
     st.markdown("### Display")
     show_water = st.toggle("Show Water", value=True, key="show_water")
     show_land = st.toggle("Show Land", value=True, key="show_land")
+
+    # Reset View button
+    if st.button("🔄 Reset View", use_container_width=True, key="reset_view"):
+        st.session_state["bounds"] = {
+            "_southWest": {"lat": -85.06, "lng": -180},
+            "_northEast": {"lat": 85.06, "lng": 180},
+        }
+        st.session_state["zoom"] = ZOOM_START
+        st.rerun()
+
+    # Export Map button
+    st.button("📥 Export Map", use_container_width=True, key="export_map", help="Download current map view as PNG")
 
     st.markdown("---")
     st.markdown("### Map Info")
@@ -391,30 +419,62 @@ def main():
     current_zoom = st.session_state["zoom"]
 
     basemap_tile = BASEMAPS[basemap_name]
-    # Stamen Terrain uses a custom URL template
-    if basemap_tile.startswith("http"):
-        tiles_arg = None
-    else:
-        tiles_arg = basemap_tile
 
-    m = folium.Map(
-        location=center,
-        zoom_start=current_zoom,
-        min_lat=-85.06,
-        max_lat=85.06,
-        min_lon=-180,
-        max_lon=180,
-        max_bounds=True,
-        min_zoom=min_zoom,
-        max_zoom=max_zoom,
-        tiles=tiles_arg,
-    )
-    if basemap_tile.startswith("http"):
+    # Handle different basemap types
+    if basemap_tile is None:
+        # No basemap - use a white/transparent base
+        m = folium.Map(
+            location=center,
+            zoom_start=current_zoom,
+            min_lat=-85.06,
+            max_lat=85.06,
+            min_lon=-180,
+            max_lon=180,
+            max_bounds=True,
+            min_zoom=min_zoom,
+            max_zoom=max_zoom,
+            tiles=None,
+            prefer_canvas=True,
+        )
+        # Add a simple white background CSS
+        m.get_root().html.add_child(folium.Element(
+            '<style>.leaflet-container { background: white !important; }</style>'
+        ))
+    elif isinstance(basemap_tile, str) and basemap_tile.startswith("http"):
+        # Custom URL template
+        m = folium.Map(
+            location=center,
+            zoom_start=current_zoom,
+            min_lat=-85.06,
+            max_lat=85.06,
+            min_lon=-180,
+            max_lon=180,
+            max_bounds=True,
+            min_zoom=min_zoom,
+            max_zoom=max_zoom,
+            tiles=None,
+            prefer_canvas=True,
+        )
         folium.TileLayer(
             tiles=basemap_tile,
             attr="Stadia/Stamen",
             name="Stamen Terrain",
         ).add_to(m)
+    else:
+        # Named tileset
+        m = folium.Map(
+            location=center,
+            zoom_start=current_zoom,
+            min_lat=-85.06,
+            max_lat=85.06,
+            min_lon=-180,
+            max_lon=180,
+            max_bounds=True,
+            min_zoom=min_zoom,
+            max_zoom=max_zoom,
+            tiles=basemap_tile,
+            prefer_canvas=True,
+        )
 
     feature_group = folium.map.FeatureGroup(name="Points")
 
@@ -528,3 +588,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # Add export functionality via JavaScript
+    if st.session_state.get("export_map", False):
+        st.markdown("""
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script>
+        // Export map functionality
+        function exportMap() {
+            const mapElement = document.querySelector('iframe').contentWindow.document.querySelector('.leaflet-container');
+            if (mapElement) {
+                html2canvas(mapElement, {
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#e8e8e8',
+                    scale: 2
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    const timestamp = new Date().toISOString().slice(0,19).replace(/:/g,'-');
+                    link.download = `brixels-map-${timestamp}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
+            }
+        }
+
+        // Auto-trigger export when button is clicked
+        setTimeout(exportMap, 500);
+        </script>
+        """, unsafe_allow_html=True)

@@ -1,10 +1,5 @@
-[theme]
-base="light"
-primaryColor="#FF9A72"
-backgroundColor="#e8e8e8"
-secondaryBackgroundColor="#d0d0d0"
-textColor="#333333"
-font = "monospace"
+# Theme colors are controlled by static/style.css
+# All styling uses custom CSS with !important flags
 
 [client]
 showSidebarNavigation = false
