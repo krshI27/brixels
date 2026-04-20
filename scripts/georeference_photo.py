@@ -6,7 +6,7 @@ then build a brick grid where:
   - brick height = depth value (quantized to plates, same as elevation brixels)
   - brick color  = average pixel color within each grid cell's footprint
 
-This would reuse the BrickIcon SVG renderer and colormap pipeline from app.py
+This would reuse the BrickIcon SVG renderer and colormap pipeline from streamlit_app.py
 but replace the R2 elevation data source with per-image depth + color sampling.
 
 Status: idea / prototype -- the helper below creates a georeferenced raster

@@ -34,7 +34,7 @@ cp .streamlit/secrets.toml.template .streamlit/secrets.toml
 ### Run
 
 ```bash
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 ### Docker
@@ -48,7 +48,7 @@ The app will be available at `http://localhost:8502`.
 ## Project Structure
 
 ```
-app.py                  # Main Streamlit application
+streamlit_app.py        # Main Streamlit application
 src/
   r2_storage.py         # Cloudflare R2 tile loading with local fallback
   cog_sampler.py        # On-demand elevation sampling from COG
