@@ -19,6 +19,7 @@ pyarrow  # For GeoParquet support
 
 # Visualization
 matplotlib
+cmaptools
 
 # Streamlit extras
 streamlit-extras
