@@ -11,7 +11,6 @@ from cmaptools import joincmap, readcpt
 from pyproj import CRS
 from shapely import box
 from src.r2_storage import load_grid_data_r2
-from streamlit.runtime.scriptrunner import add_script_run_ctx
 from streamlit_folium import st_folium
 
 st.set_page_config(
