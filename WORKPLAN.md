@@ -1,14 +1,16 @@
 # WORKPLAN — brixels
 
-**Status**: ~80% complete. GitHub mirror ready. R2 storage integrated. Streamlit Cloud UNBLOCKED.
-**Critical path**: Deploy → print size UI → Prodigi integration → first revenue.
-**Last commit**: 2025-12-20 (COG sampler). Env updated 2026-04-20.
+**Status**: DEPLOYED on Streamlit Cloud (2026-04-25). R2 storage integrated. No Prodigi code yet.
+**Critical path**: Verify R2 secrets on Cloud → print size UI → Prodigi integration → first revenue.
+**⚠️ Verify**: R2 auth secrets (`CLOUDFLARE_S3_API` or `R2_ACCESS_ID`+`R2_SECRET_ACCESS_KEY`+`R2_ACCOUNT_ID`) must be in Streamlit Cloud secrets dashboard — local secrets.toml only has bucket name + Prodigi key.
+**Last commit**: fix: remove unused import + src/__init__.py (2026-04-25).
 
 ---
 
 ## This sprint (Apr 24 – May 1)
 
-- [ ] **BRX-7** ~1hr: Deploy to Streamlit Cloud — connect `github.com/krshI27/brixels`, verify R2 loads (`brixels_world.gpkg`), test map renders
+- [x] **BRX-7**: Deployed to Streamlit Cloud (2026-04-25)
+- [ ] **BRX-R2-VERIFY** ~15min: Open live Cloud URL, confirm map data loads from R2 (if blank/error → check R2 secrets in Cloud dashboard)
 - [ ] **BRX-3** ~1hr: Add print size selector in sidebar — A4 / A3 / A2 / square; store in session_state; needed before Prodigi integration
 
 ## Next sprint

@@ -25,7 +25,7 @@ def get_r2_client():
     """Create R2 client using Streamlit secrets."""
     endpoint = (
         st.secrets.get("CLOUDFLARE_S3_API")
-        or f"https://{st.secrets.get('CLOUDFLARRE_ACCOUNT_ID', st.secrets.get('R2_ACCOUNT_ID'))}.r2.cloudflarestorage.com"
+        or f"https://{st.secrets.get('CLOUDFLARE_ACCOUNT_ID', st.secrets.get('R2_ACCOUNT_ID'))}.r2.cloudflarestorage.com"
     )
     access_key = st.secrets.get("R2_ACCESS_ID") or st.secrets.get("R2_ACCESS_KEY")
     secret_key = st.secrets.get("R2_SECRET_ACCESS_KEY") or st.secrets.get(
