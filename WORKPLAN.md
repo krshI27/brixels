@@ -7,20 +7,23 @@
 
 ---
 
-## This sprint (Apr 24 – May 1)
+## Active priorities (2026-04-25 — Path A focus, revenue deferred)
+
+### Path A: Zine Vol.1 preset rollout (do first — unblocks zine pipeline)
+
+- [ ] **BRX-R2-VERIFY** ~15min: Open live Cloud URL, confirm map data loads from R2 (if blank/error → check R2 secrets in Cloud dashboard). Blocker for everything below.
+- [ ] **ZV1-4** ~1hr: Add `?preset=` URL loader (see pattern below) — encode lat/lon/zoom/style as JSON; add `key=` to all widgets matching params; test QR round-trip
+- [ ] **ZV1-preset-brixels** ~30min: Pick 1–2 hero locations → save params as `presets/zine-vol1-*.json`
+
+### Revenue path (deferred until Zine Vol.1 produced)
 
 - [x] **BRX-7**: Deployed to Streamlit Cloud (2026-04-25)
-- [ ] **BRX-R2-VERIFY** ~15min: Open live Cloud URL, confirm map data loads from R2 (if blank/error → check R2 secrets in Cloud dashboard)
-- [ ] **BRX-3** ~1hr: Add print size selector in sidebar — A4 / A3 / A2 / square; store in session_state; needed before Prodigi integration
-
-## Next sprint
-
-- [ ] **BRX-EXPORT** ~1hr: Implement print export — render map at A4 resolution (2480×3508px / 300dpi); export as JPEG via `PIL.Image.save(buf, "JPEG", dpi=(300,300))`; verify output size satisfies Prodigi spec before wiring Prodigi
-- [ ] **BRX-UPLOAD** ~30min: Upload print PNG to R2 public bucket (`krshi27-prints/`) via boto3 → return public URL; this URL passes to Prodigi as the asset
-- [ ] **BRX-8** ~1.5hr: Prodigi order flow — `POST https://api.prodigi.com/v4.0/orders` with `GLOBAL-FAP-11.7X8.3` (A4) / `GLOBAL-FAP-16.5X11.7` (A3); use `PRODIGI_API_KEY` from `.streamlit/secrets.toml`; return order ID
-- [ ] **BRX-9** ~1hr: Checkout UI — name, address, email form; submit triggers BRX-UPLOAD → BRX-8 in sequence; show Prodigi order confirmation
-- [ ] **ZV1-4** ~1hr: Add `?preset=` URL loader (see pattern below) — encode lat/lon/zoom/style as JSON; add `key=` to all widgets; test QR round-trip
-- [ ] **BRX-10** ~1hr: Create 5 showcase presets — specific locations, strong output; save as `presets/zine-vol1-*.json`
+- [ ] **BRX-3** ~1hr: Print size selector in sidebar — A4 / A3 / A2 / square; store in session_state
+- [ ] **BRX-EXPORT** ~1hr: Print export — render map at A4 resolution (2480×3508px / 300dpi); export as JPEG via `PIL.Image.save(buf, "JPEG", dpi=(300,300))`; verify ≥ Prodigi spec
+- [ ] **BRX-UPLOAD** ~30min: Upload print PNG to R2 public bucket (`krshi27-prints/`) via boto3 → return public URL
+- [ ] **BRX-8** ~1.5hr: Prodigi order flow — `POST https://api.prodigi.com/v4.0/orders` with `GLOBAL-FAP-11.7X8.3` (A4) / `GLOBAL-FAP-16.5X11.7` (A3); `PRODIGI_API_KEY` from `.streamlit/secrets.toml`
+- [ ] **BRX-9** ~1hr: Checkout UI — name/address/email form; submit triggers BRX-UPLOAD → BRX-8
+- [ ] **BRX-10** ~1hr: 5 showcase presets — strong locations; save as `presets/showcase-*.json`
 
 ## Preset loader pattern (Streamlit)
 
