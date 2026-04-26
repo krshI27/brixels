@@ -12,8 +12,8 @@
 ### Path A: Zine Vol.1 preset rollout (do first — unblocks zine pipeline)
 
 - [ ] **BRX-R2-VERIFY** ~15min: Open live Cloud URL, confirm map data loads from R2 (if blank/error → check R2 secrets in Cloud dashboard). Blocker for everything below.
-- [ ] **ZV1-4** ~1hr: Add `?preset=` URL loader (see pattern below) — encode lat/lon/zoom/style as JSON; add `key=` to all widgets matching params; test QR round-trip
-- [ ] **ZV1-preset-brixels** ~30min: Pick 1–2 hero locations → save params as `presets/zine-vol1-*.json`
+- [x] **ZV1-4** (2026-04-26): `?preset=` loader + `_preset_url()` generator — hydrates `cmap_selection`, `basemap_selection`, `show_water`, `show_land`, `bounds`, `zoom` via `st.session_state.setdefault`. Sidebar Preset URL expander shows shareable URL. Mirrors stairset commit `47d4f14`. Schema: `notes/Art & Creativity/Preset Schema.md`.
+- [ ] **ZV1-preset-brixels** ~30min: Pick 1–2 hero locations → save params as `presets/zine-vol1-*.json` (use Preset URL expander to capture state)
 
 ### Revenue path (deferred until Zine Vol.1 produced)
 

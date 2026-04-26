@@ -1,4 +1,6 @@
 import colorsys
+import json
+import urllib.parse
 from functools import lru_cache
 
 import folium
@@ -25,6 +27,48 @@ with open("static/style.css") as css:
         f"<style>{css.read()}</style>",
         unsafe_allow_html=True,
     )
+
+
+PRESET_KEYS = (
+    "cmap_selection",
+    "basemap_selection",
+    "show_water",
+    "show_land",
+    "bounds",
+    "zoom",
+)
+
+
+def _load_preset() -> None:
+    preset_raw = st.query_params.get("preset")
+    if not preset_raw:
+        return
+    preset_text = preset_raw[0] if isinstance(preset_raw, list) else preset_raw
+    try:
+        preset = json.loads(preset_text)
+        for key, value in preset.get("params", {}).items():
+            if key in PRESET_KEYS:
+                st.session_state.setdefault(key, value)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass
+
+
+def _preset_url() -> str:
+    params = {key: st.session_state.get(key) for key in PRESET_KEYS}
+    payload = {"name": "Brixels preset", "app": "brixels", "params": params}
+    return f"?preset={urllib.parse.quote(json.dumps(payload, separators=(',', ':')))}"
+
+
+_load_preset()
+
+
+if "bounds" not in st.session_state:
+    st.session_state["bounds"] = {
+        "_southWest": {"lat": -85.06, "lng": -180},
+        "_northEast": {"lat": 85.06, "lng": 180},
+    }
+if "zoom" not in st.session_state:
+    st.session_state["zoom"] = 2
 
 
 st.session_state["grid_size_dict"] = {
@@ -246,14 +290,11 @@ with st.sidebar:
     brick_svg = build_brick_info_svg(gs / 1000, elev_per_plate)
     st.markdown(brick_svg, unsafe_allow_html=True)
 
+    with st.expander("Preset URL"):
+        st.write("Share or embed these exact parameters:")
+        st.code(_preset_url())
+
 cmap_combined = readcpt(cmap_path)
-if "bounds" not in st.session_state:
-    st.session_state["bounds"] = {
-        "_southWest": {"lat": -85.06, "lng": -180},
-        "_northEast": {"lat": 85.06, "lng": 180},
-    }
-if "zoom" not in st.session_state:
-    st.session_state["zoom"] = ZOOM_START
 
 
 def traverse(d):
